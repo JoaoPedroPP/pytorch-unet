@@ -1,4 +1,5 @@
 import copy
+import os
 import time
 import torch
 import torch.nn.functional as F
@@ -6,6 +7,7 @@ import torch.optim as optim
 
 from collections import defaultdict
 from Dataset.dataset import LIDCDataset
+from sklearn.model_selection import train_test_split
 from torch.optim import lr_scheduler
 from torch.utils.data import DataLoader
 from torchvision import transforms
@@ -17,15 +19,13 @@ def dice(pred, target, smooth=1.):
     target = target.contiguous()
 
     intersection = (pred * target).sum()
-    # print((pred*target).sum())
 
     dice = (2. * intersection + smooth) / (pred.sum() + target.sum() + smooth)
 
     return dice
-    # return loss.mean()
 
 
-def calc_loss(pred, target, metrics, bce_weight=1.0):
+def calc_loss(pred, target, metrics):
     dice_coef = dice(pred, target)
 
     loss = 1 - dice_coef
@@ -56,17 +56,27 @@ def print_metrics(metrics, epoch_samples, phase):
 
     print("{}: {}".format(phase, ", ".join(outputs)))
 
-def get_data_loaders():
+def get_data_loaders(dataset_path):
     # use the same transformations for train/val in this example
+    raw = list(filter(lambda l: not l.endswith('edge_mask.png'), os.listdir(dataset_path)))
+    input_imgs = list(filter(lambda l: not l.endswith('mask.png'), raw))
+    mask_imgs = list(filter(lambda l: l.endswith('mask.png'), raw))
+
+    input_imgs.sort()
+    mask_imgs.sort()
+
+    input_imgs_paths = list(map(lambda p: os.path.join(dataset_path, p), input_imgs))
+    mask_imgs_paths = list(map(lambda p: os.path.join(dataset_path, p), mask_imgs))
+
+    train_inputs, test_inputs, train_masks, test_masks = train_test_split(input_imgs_paths, mask_imgs_paths, test_size=0.2, shuffle=True, random_state=42)
+
     trans = transforms.Compose([
         transforms.ToTensor(),
         transforms.Normalize([0.485, 0.456, 0.406], [0.229, 0.224, 0.225]) # imagenet
     ])
 
-    # train_set = SimDataset(100, transform = trans)
-    # test_set = SimDataset(20, transform = trans)
-    train_set = LIDCDataset('./support_images/dataset/raw')
-    test_set = LIDCDataset('./support_images/dataset/raw')
+    train_set = LIDCDataset(train_inputs,train_masks)
+    test_set = LIDCDataset(test_inputs,test_masks)
 
     image_datasets = {
         'train': train_set, 'test': test_set
@@ -81,8 +91,8 @@ def get_data_loaders():
 
     return dataloaders
 
-def train_model(model, optimizer, scheduler, num_epochs=25):
-    dataloaders = get_data_loaders()
+def train_model(model, optimizer, scheduler, dataset_path, num_epochs=25):
+    dataloaders = get_data_loaders(dataset_path=dataset_path)
     device = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
     best_model_wts = copy.deepcopy(model.state_dict())
     best_loss = 1e10
@@ -151,6 +161,7 @@ def main():
 
     num_classes = 1
     epochs = 2
+    dataset_path = './support_images/dataset/raw'
     device = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
 
     model = UNet(in_channels=1, out_channels=num_classes).to(device)
@@ -158,6 +169,6 @@ def main():
 
     exp_lr_scheduler = lr_scheduler.StepLR(optimizer_ft, step_size=30, gamma=0.1)
 
-    model = train_model(model, optimizer_ft, exp_lr_scheduler, num_epochs=epochs)
+    model = train_model(model, optimizer_ft, exp_lr_scheduler, num_epochs=epochs, dataset_path=dataset_path)
 
 main()
