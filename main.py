@@ -5,33 +5,46 @@ import torch.nn.functional as F
 import torch.optim as optim
 
 from collections import defaultdict
+from Dataset.dataset import LIDCDataset
 from torch.optim import lr_scheduler
 from torch.utils.data import DataLoader
 from torchvision import transforms
 
-from Model import UNet
+from UNet.UNet import UNet
 
-def dice_loss(pred, target, smooth=1.):
+def dice(pred, target, smooth=1.):
     pred = pred.contiguous()
     target = target.contiguous()
 
-    intersection = (pred * target).sum(dim=2).sum(dim=2)
+    intersection = (pred * target).sum()
+    # print((pred*target).sum())
 
-    loss = (1 - ((2. * intersection + smooth) / (pred.sum(dim=2).sum(dim=2) + target.sum(dim=2).sum(dim=2) + smooth)))
+    dice = (2. * intersection + smooth) / (pred.sum() + target.sum() + smooth)
 
-    return loss.mean()
+    return dice
+    # return loss.mean()
 
 
-def calc_loss(pred, target, metrics, bce_weight=0.5):
+def calc_loss(pred, target, metrics, bce_weight=1.0):
+    dice_coef = dice(pred, target)
+
+    loss = 1 - dice_coef
+
+    metrics['dice'] += dice_coef.data.cpu().numpy()
+    metrics['loss'] += loss.data.cpu().numpy()
+
+    return loss
+
+def calc_loss_original(pred, target, metrics, bce_weight=1.0):
     bce = F.binary_cross_entropy_with_logits(pred, target)
 
     pred = F.sigmoid(pred)
-    dice = dice_loss(pred, target)
+    dice_loss = 1 - dice(pred, target)
 
-    loss = bce * bce_weight + dice * (1 - bce_weight)
+    loss = bce * bce_weight + dice_loss * (1 - bce_weight)
 
     metrics['bce'] += bce.data.cpu().numpy() * target.size(0)
-    metrics['dice'] += dice.data.cpu().numpy() * target.size(0)
+    metrics['dice'] += dice_loss.data.cpu().numpy() * target.size(0)
     metrics['loss'] += loss.data.cpu().numpy() * target.size(0)
 
     return loss
@@ -50,14 +63,16 @@ def get_data_loaders():
         transforms.Normalize([0.485, 0.456, 0.406], [0.229, 0.224, 0.225]) # imagenet
     ])
 
-    train_set = SimDataset(100, transform = trans)
-    test_set = SimDataset(20, transform = trans)
+    # train_set = SimDataset(100, transform = trans)
+    # test_set = SimDataset(20, transform = trans)
+    train_set = LIDCDataset('./support_images/dataset/raw')
+    test_set = LIDCDataset('./support_images/dataset/raw')
 
     image_datasets = {
         'train': train_set, 'test': test_set
     }
 
-    batch_size = 25
+    batch_size = 1
 
     dataloaders = {
         'train': DataLoader(train_set, batch_size=batch_size, shuffle=True, num_workers=0),
@@ -81,7 +96,6 @@ def train_model(model, optimizer, scheduler, num_epochs=25):
         # Each epoch has a training and validation phase
         for phase in ['train', 'test']:
             if phase == 'train':
-                scheduler.step()
                 for param_group in optimizer.param_groups:
                     print("LR", param_group['lr'])
 
@@ -92,9 +106,9 @@ def train_model(model, optimizer, scheduler, num_epochs=25):
             metrics = defaultdict(float)
             epoch_samples = 0
 
-            for inputs, labels in dataloaders[phase]:
-                inputs = inputs.to(device)
-                labels = labels.to(device)
+            for inputs, masks in dataloaders[phase]:
+                inputs = inputs.float().to(device)
+                masks = masks.float().to(device)
 
                 # zero the parameter gradients
                 optimizer.zero_grad()
@@ -103,7 +117,7 @@ def train_model(model, optimizer, scheduler, num_epochs=25):
                 # track history if only in train
                 with torch.set_grad_enabled(phase == 'train'):
                     outputs = model(inputs)
-                    loss = calc_loss(outputs, labels, metrics)
+                    loss = calc_loss(outputs, masks, metrics)
 
                     # backward + optimize only if in training phase
                     if phase == 'train':
@@ -122,6 +136,7 @@ def train_model(model, optimizer, scheduler, num_epochs=25):
                 best_loss = epoch_loss
                 best_model_wts = copy.deepcopy(model.state_dict())
 
+        scheduler.step()
         time_elapsed = time.time() - since
         print('{:.0f}m {:.0f}s'.format(time_elapsed // 60, time_elapsed % 60))
 
@@ -138,7 +153,7 @@ def main():
     epochs = 2
     device = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
 
-    model = UNet(num_classes).to(device)
+    model = UNet(in_channels=1, out_channels=num_classes).to(device)
     optimizer_ft = optim.Adam(filter(lambda p: p.requires_grad, model.parameters()), lr=1e-4)
 
     exp_lr_scheduler = lr_scheduler.StepLR(optimizer_ft, step_size=30, gamma=0.1)
