@@ -67,7 +67,7 @@ class UNet(nn.Module):
         self.concat = nn.ModuleList([CropAndConcatenate() for _ in range(4)])
 
         self.final_conv = nn.Conv2d(64, out_channels, kernel_size=1)
-        self.final_activation = nn.Softmax(dim=out_channels)
+        # self.final_activation = nn.Softmax(dim=out_channels)
 
     def forward(self, x: torch.Tensor):
         pass_trough = []
@@ -84,6 +84,6 @@ class UNet(nn.Module):
             x = self.up_conv[i](x)
 
         out = self.final_conv(x)
-        out = self.final_activation(out)
+        # out = self.final_activation(out)
 
         return out
