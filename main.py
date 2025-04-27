@@ -37,7 +37,7 @@ def dice_original(pred, target, smooth=1.):
 
     intersection = (pred * target).sum(dim=2).sum(dim=2)
 
-    loss = (1 - ((2. * intersection + smooth) / (pred.sum(dim=2).sum(dim=2) + target.sum(dim=2).sum(dim=2) + smooth)))
+    loss = ((2. * intersection + smooth) / (pred.sum(dim=2).sum(dim=2) + target.sum(dim=2).sum(dim=2) + smooth))
 
     return loss.mean()
 
@@ -77,17 +77,17 @@ def print_metrics(metrics, epoch_samples, phase):
 
     print("{}: {}".format(phase, ", ".join(outputs)))
 
-def get_data_loaders(dataset_path):
+def get_data_loaders(dataset_path, mask_path):
     # use the same transformations for train/val in this example
-    raw = list(filter(lambda l: not l.endswith('edge_mask.png'), os.listdir(dataset_path)))
-    input_imgs = list(filter(lambda l: not l.endswith('mask.png'), raw))
+    raw = list(filter(lambda l: not l.endswith('edge_mask.png'), os.listdir(mask_path)))
+    input_imgs = list(filter(lambda l: not l.endswith('.py'), os.listdir(dataset_path)))
     mask_imgs = list(filter(lambda l: l.endswith('mask.png'), raw))
 
     input_imgs.sort()
     mask_imgs.sort()
 
     input_imgs_paths = list(map(lambda p: os.path.join(dataset_path, p), input_imgs))
-    mask_imgs_paths = list(map(lambda p: os.path.join(dataset_path, p), mask_imgs))
+    mask_imgs_paths = list(map(lambda p: os.path.join(mask_path, p), mask_imgs))
 
     train_inputs, validation_inputs, train_masks, validation_masks = train_test_split(input_imgs_paths, mask_imgs_paths, test_size=0.2, shuffle=True)
     train_inputs, test_inputs, train_masks, test_masks = train_test_split(train_inputs, train_masks, test_size=0.3, shuffle=True)
@@ -116,8 +116,11 @@ def get_data_loaders(dataset_path):
 
     return dataloaders
 
-def train_model(model, optimizer, scheduler, dataset_path, num_epochs=25):
-    dataloaders = get_data_loaders(dataset_path=dataset_path)
+def train_model(model, optimizer, scheduler, dataset_path, num_epochs=25, mask_path=None):
+    if mask_path == None:
+        dataloaders = get_data_loaders(dataset_path=dataset_path, mask_path=dataset_path)
+    else:
+        dataloaders = get_data_loaders(dataset_path=dataset_path, mask_path=mask_path)
     device = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
     best_model_wts = copy.deepcopy(model.state_dict())
     best_loss = 1e10
@@ -190,42 +193,40 @@ def main():
     print("Starting the model")
 
     num_classes = 1
-    epochs = 5
-    dataset_path = './support_images/dataset/raw'
+    epochs = 2
+    dataset_path = './support_images/dataset/raw2'
+    mask_path = './support_images/dataset/raw'
     # dataset_path = '/run/media/jpolonip/JP2-HD/MestradoFiles/Dataset/raw2/train'
     device = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
 
-    model = UNet(in_channels=1, out_channels=num_classes).to(device)
+    model = UNet(in_channels=3, out_channels=num_classes).to(device)
     optimizer_ft = optim.Adam(filter(lambda p: p.requires_grad, model.parameters()), lr=1e-5)
 
     exp_lr_scheduler = lr_scheduler.StepLR(optimizer_ft, step_size=30, gamma=0.1)
 
-    model, dataloaders = train_model(model, optimizer_ft, exp_lr_scheduler, num_epochs=epochs, dataset_path=dataset_path)
+    model, dataloaders = train_model(model, optimizer_ft, exp_lr_scheduler, num_epochs=epochs, dataset_path=dataset_path, mask_path=mask_path)
 
     model.eval()
     i = 1
     for inputs, masks in dataloaders['validation']:
-        inputs = inputs.float().to(device)
-        masks = masks.float().to(device)
+        input = inputs.float().to(device)
+        mask = masks.float().to(device)
 
-        pred = model(inputs)
+        pred = model(input)
         pred = F.sigmoid(pred)
-        # pred = F.softmax(pred)
-        print(pred.shape)
-        # print(pred)
         pred = pred.data.cpu().numpy()
-        print(pred.min(), pred.max())
-        # np.squeeze(pred, axis=0)
-        print(pred.shape)
 
         pred = (pred[0] * 255).astype(np.uint8)
-        # pred = (pred[:, :, 0] * 255.).astype(np.uint8)
-        print(pred.shape)
+        input = input.numpy()
+        mask = mask.numpy()
 
-        im = Image.fromarray(pred[0])
-        print(pred.shape)
-        # pred = transforms.functional.convert_image_dtype(pred, torch.uint8)
-        im.save(f'./support_images/preds/pred_{i:05}.png')
+        out = Image.fromarray(pred[0])
+        inn = Image.fromarray(input[0][0].astype(np.uint8), 'L')
+        mak = Image.fromarray((mask[0][0] * 255).astype(np.uint8), 'L')
+
+        out.save(f'./support_images/preds/{i:05}_pred.png')
+        inn.save(f'./support_images/preds/{i:05}_input.png')
+        mak.save(f'./support_images/preds/{i:05}_mask.png')
         
         i += 1
 
