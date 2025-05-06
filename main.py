@@ -1,4 +1,5 @@
 import copy
+import csv
 import numpy as np
 import os
 import time
@@ -13,25 +14,12 @@ from sklearn.model_selection import train_test_split
 from torch.amp.grad_scaler import GradScaler
 from torch.optim import lr_scheduler
 from torch.utils.data import DataLoader
+from torcheval.metrics import BinaryAccuracy, BinaryPrecision, BinaryRecall, BinaryF1Score
 from torchvision import transforms
-# from torchvision.io import write_png
 
 from UNet.UNet import UNet
 
 def dice(pred, target, smooth=1.):
-    pred = pred.contiguous()
-    target = target.contiguous()
-    
-    pred[pred > 0] = 1
-    pred[pred <= 0] = 0
-
-    intersection = (pred * target).sum()
-
-    dice = (2. * (intersection + smooth)) / (pred.sum() + target.sum() + smooth)
-
-    return dice
-
-def dice_original(pred, target, smooth=1.):
     pred = pred.contiguous()
     target = target.contiguous()
 
@@ -44,40 +32,60 @@ def dice_original(pred, target, smooth=1.):
 def calc_loss(pred, target, metrics):
     pred = F.sigmoid(pred)
 
-    dice_coef = dice_original(pred, target)
+    dice_coef = dice(pred, target)
     loss = 1 - dice_coef
     bce = F.binary_cross_entropy_with_logits(pred, target)
-    # bce = F.binary_cross_entropy(pred, target)
-    # loss = bce
+
+    pred_flatten = pred.flatten()
+    target_flatten = target.flatten()
+
+    acc = BinaryAccuracy(threshold=0.5)
+    acc.update(pred_flatten, target_flatten)
+
+    prec = BinaryPrecision(threshold=0.5)
+    prec.update(pred_flatten, target_flatten)
+
+    # recall = BinaryRecall(threshold=0.5)
+    # recall.update(pred_flatten, target_flatten)
+    # recall.update(torch.tensor([0.2, 0.7]), torch.tensor([0, 1]))
+
+    f1 = BinaryF1Score(threshold=0.5)
+    f1.update(pred_flatten, target_flatten)
 
     metrics['dice'] += dice_coef.data.cpu().numpy()
     metrics['loss'] += loss.data.cpu().numpy()
     metrics['bce'] += bce.data.cpu().numpy()
+    metrics['accuracy'] += acc.compute()
+    metrics['precision'] += prec.compute()
+    # metrics['recall'] += recall.compute()
+    metrics['f1'] += f1.compute()
 
     return loss
 
-def calc_loss_original(pred, target, metrics, bce_weight=0.5):
-    bce = F.binary_cross_entropy_with_logits(pred, target)
-
-    # pred = F.sigmoid(pred)
-    dice_loss = 1 - dice(pred, target)
-
-    loss = bce * bce_weight + dice_loss * (1 - bce_weight)
-
-    metrics['bce'] += bce.data.cpu().numpy() * target.size(0)
-    metrics['dice'] += dice_loss.data.cpu().numpy() * target.size(0)
-    metrics['loss'] += loss.data.cpu().numpy() * target.size(0)
-
-    return loss
-
-def print_metrics(metrics, epoch_samples, phase):
+def print_metrics(metrics, epoch_samples, phase, epoch):
     outputs = []
+    csv_metrics = []
+    csv_header = ['epoch']
     for k in metrics.keys():
         outputs.append("{}: {:4f}".format(k, metrics[k] / epoch_samples))
+        csv_metrics.append(metrics[k]/epoch_samples)
+        if phase == 'train' and epoch == 0:
+            csv_header.append(f'{k}_train')
+            csv_header.append(f'{k}_test')
+
+    if phase == 'train' and epoch == 0:
+        write_csv(csv_header, 'w')
 
     print("{}: {}".format(phase, ", ".join(outputs)))
 
-def get_data_loaders(dataset_path, mask_path):
+    return csv_metrics
+
+def write_csv(data, mode='a'):
+    with open('logs.csv',mode, newline='') as csv_file:
+        writer = csv.writer(csv_file)
+        writer.writerows([data])
+
+def get_data_loaders(dataset_path, mask_path, seed=None):
     # use the same transformations for train/val in this example
     raw = list(filter(lambda l: not l.endswith('edge_mask.png'), os.listdir(mask_path)))
     input_imgs = list(filter(lambda l: not l.endswith('.py'), os.listdir(dataset_path)))
@@ -89,8 +97,8 @@ def get_data_loaders(dataset_path, mask_path):
     input_imgs_paths = list(map(lambda p: os.path.join(dataset_path, p), input_imgs))
     mask_imgs_paths = list(map(lambda p: os.path.join(mask_path, p), mask_imgs))
 
-    train_inputs, validation_inputs, train_masks, validation_masks = train_test_split(input_imgs_paths, mask_imgs_paths, test_size=0.2, shuffle=True)
-    train_inputs, test_inputs, train_masks, test_masks = train_test_split(train_inputs, train_masks, test_size=0.3, shuffle=True)
+    train_inputs, validation_inputs, train_masks, validation_masks = train_test_split(input_imgs_paths, mask_imgs_paths, test_size=0.2, shuffle=True, random_state=seed)
+    train_inputs, test_inputs, train_masks, test_masks = train_test_split(train_inputs, train_masks, test_size=0.3, shuffle=True, random_state=seed)
     print(len(train_inputs), len(test_inputs), len(validation_inputs))
 
     trans = transforms.Compose([
@@ -116,11 +124,11 @@ def get_data_loaders(dataset_path, mask_path):
 
     return dataloaders
 
-def train_model(model, optimizer, scheduler, dataset_path, num_epochs=25, mask_path=None):
+def train_model(model, optimizer, scheduler, dataset_path, num_epochs=25, mask_path=None, seed=None):
     if mask_path == None:
-        dataloaders = get_data_loaders(dataset_path=dataset_path, mask_path=dataset_path)
+        dataloaders = get_data_loaders(dataset_path=dataset_path, mask_path=dataset_path, seed=seed)
     else:
-        dataloaders = get_data_loaders(dataset_path=dataset_path, mask_path=mask_path)
+        dataloaders = get_data_loaders(dataset_path=dataset_path, mask_path=mask_path, seed=seed)
     device = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
     best_model_wts = copy.deepcopy(model.state_dict())
     best_loss = 1e10
@@ -128,10 +136,12 @@ def train_model(model, optimizer, scheduler, dataset_path, num_epochs=25, mask_p
 
     scaler = GradScaler(enabled=False)
 
+    csv_metrics = []
     for epoch in range(num_epochs):
         print('Epoch {}/{}'.format(epoch, num_epochs - 1))
         print('-' * 10)
 
+        csv_metrics = []
         since = time.time()
 
         # Each epoch has a training and validation phase
@@ -170,7 +180,11 @@ def train_model(model, optimizer, scheduler, dataset_path, num_epochs=25, mask_p
                 # statistics
                 epoch_samples += inputs.size(0)
 
-            print_metrics(metrics, epoch_samples, phase)
+            if phase == 'train':
+                csv_metrics = print_metrics(metrics, epoch_samples, phase, epoch)
+            else:
+                test_metrics = print_metrics(metrics, epoch_samples, phase, epoch)
+                csv_metrics = np.concatenate(([epoch], csv_metrics, test_metrics))
             epoch_loss = metrics['loss'] / epoch_samples
 
             # deep copy the model
@@ -182,6 +196,7 @@ def train_model(model, optimizer, scheduler, dataset_path, num_epochs=25, mask_p
         scheduler.step()
         time_elapsed = time.time() - since
         print('{:.0f}m {:.0f}s'.format(time_elapsed // 60, time_elapsed % 60))
+        write_csv(csv_metrics)
 
     print('Best val loss: {:4f}'.format(best_loss))
 
@@ -199,12 +214,12 @@ def main():
     # dataset_path = '/run/media/jpolonip/JP2-HD/MestradoFiles/Dataset/raw2/train'
     device = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
 
-    model = UNet(in_channels=3, out_channels=num_classes).to(device)
+    model = UNet(in_channels=2, out_channels=num_classes).to(device)
     optimizer_ft = optim.Adam(filter(lambda p: p.requires_grad, model.parameters()), lr=1e-5)
 
     exp_lr_scheduler = lr_scheduler.StepLR(optimizer_ft, step_size=30, gamma=0.1)
 
-    model, dataloaders = train_model(model, optimizer_ft, exp_lr_scheduler, num_epochs=epochs, dataset_path=dataset_path, mask_path=mask_path)
+    model, dataloaders = train_model(model, optimizer_ft, exp_lr_scheduler, num_epochs=epochs, dataset_path=dataset_path, mask_path=mask_path, seed=123)
 
     model.eval()
     i = 1
