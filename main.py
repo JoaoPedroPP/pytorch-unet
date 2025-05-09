@@ -88,7 +88,7 @@ def write_csv(data, mode='a'):
 def get_data_loaders(dataset_path, mask_path, seed=None):
     # use the same transformations for train/val in this example
     raw = list(filter(lambda l: not l.endswith('edge_mask.png'), os.listdir(mask_path)))
-    input_imgs = list(filter(lambda l: not l.endswith('.py'), os.listdir(dataset_path)))
+    input_imgs = list(filter(lambda l: l.endswith('.npy'), os.listdir(dataset_path)))
     mask_imgs = list(filter(lambda l: l.endswith('mask.png'), raw))
 
     input_imgs.sort()
