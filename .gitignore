@@ -180,5 +180,5 @@ cython_debug/
 
 
 
-support_images/dataset/raw/*.png
+support_images/dataset/*/*.png
 support_images/preds/*.png

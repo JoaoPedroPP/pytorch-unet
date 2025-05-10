@@ -1,5 +1,6 @@
 torch==2.6.0
 torchvision==0.21.0
+torcheval==0.0.7
 Pillow==11.1.0
 numpy==2.2.3
 scikit-learn==1.6.1

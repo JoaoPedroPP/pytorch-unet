@@ -19,14 +19,15 @@ def main(data_dir, output_dir):
         gt = np.array(gt_img)
         mask = np.array(mask_img)
         edge = np.array(edge_mask_img)
-        merge = np.array([gt, mask, edge])
+        # merge = np.array([gt, mask, edge])
+        merge = np.array([gt, edge])
         # Aqui o array sai (3x128x96)
         # print(merge)
-        # print(merge.shape)
+        print(merge.shape)
 
         # Aqui os array sai 128x96x3
-        merge = np.ravel(merge, order='F')
-        merge = np.reshape(merge, (128, 96, 3))
+        # merge = np.ravel(merge, order='F')
+        # merge = np.reshape(merge, (128, 96, 3))
         # print(merge)
         # print(merge.shape)
 
@@ -34,5 +35,5 @@ def main(data_dir, output_dir):
         print(f"{filename}: Done")
 
 
-# main('../support_images/dataset/raw/', '../support_images/dataset/raw2')
-main("/run/media/jpolonip/JP2-HD/MestradoFiles/Dataset/raw/train", "/run/media/jpolonip/JP2-HD/MestradoFiles/Dataset/raw_gt+edge+mask/train")
+main('../support_images/dataset/raw/', '../support_images/dataset/raw2')
+# main("/run/media/jpolonip/JP2-HD/MestradoFiles/Dataset/raw/train", "/run/media/jpolonip/JP2-HD/MestradoFiles/Dataset/raw_gt+edge+mask/train")
