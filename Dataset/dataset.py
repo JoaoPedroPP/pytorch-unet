@@ -1,3 +1,4 @@
+import numpy as np
 from torch.utils.data import Dataset
 from torchvision.io import decode_image
 
@@ -13,6 +14,7 @@ class LIDCDataset(Dataset):
 
     def __getitem__(self, idx):
         image = decode_image(self.imgs[idx], mode='GRAY')
+        # image = np.load(self.imgs[idx])
         if self.transform:
             image = self.transform(image)
         mask = decode_image(self.masks[idx], mode='GRAY').div(255)
