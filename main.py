@@ -199,7 +199,7 @@ def train_model(model, optimizer, scheduler, dataset_path, num_epochs=25, mask_p
                 # deep copy the model
                 if phase == 'test' and epoch_loss < best_loss:
                     print("saving best model")
-                    best_csv_metrics = csv_metrics
+                    # best_csv_metrics = csv_metrics
                     best_loss = epoch_loss
                     best_model_wts = copy.deepcopy(model.state_dict())
 
@@ -220,19 +220,20 @@ def main():
     print("Starting the model")
 
     seed = 42
+    input_dimensions = 2
     num_classes = 1
     epochs = 1
-    folds = 2
+    folds = 10
 
     # For edge compose trainings
-    dataset_path = './support_images/dataset/raw2'
+    dataset_path = './support_images/dataset/raw'
     mask_path = './support_images/dataset/raw'
 
     # For regular sets training
     # dataset_path = '/run/media/jpolonip/JP2-HD/MestradoFiles/Dataset/raw2/train'
     device = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
 
-    model = UNet(in_channels=2, out_channels=num_classes).to(device)
+    model = UNet(in_channels=input_dimensions, out_channels=num_classes).to(device)
     optimizer_ft = optim.Adam(filter(lambda p: p.requires_grad, model.parameters()), lr=1e-5)
 
     exp_lr_scheduler = lr_scheduler.StepLR(optimizer_ft, step_size=30, gamma=0.1)
