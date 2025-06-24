@@ -10,7 +10,7 @@ import torch.optim as optim
 from collections import defaultdict
 from Dataset.dataset import LIDCDataset
 from PIL import Image
-from sklearn.model_selection import train_test_split
+from sklearn.model_selection import KFold, train_test_split
 from torch.amp.grad_scaler import GradScaler
 from torch.optim import lr_scheduler
 from torch.utils.data import DataLoader
@@ -62,34 +62,37 @@ def calc_loss(pred, target, metrics):
 
     return loss
 
-def print_metrics(metrics, epoch_samples, phase, epoch):
+def print_metrics(metrics, epoch_samples, phase, epoch, fold):
     outputs = []
     csv_metrics = []
-    csv_header = ['epoch']
+    csv_header = ['epoch', 'fold']
+    csv_test_header = []
     for k in metrics.keys():
         outputs.append("{}: {:4f}".format(k, metrics[k] / epoch_samples))
         csv_metrics.append(metrics[k]/epoch_samples)
         if phase == 'train' and epoch == 0:
             csv_header.append(f'{k}_train')
-            csv_header.append(f'{k}_test')
+            csv_test_header.append(f'{k}_test')
 
-    if phase == 'train' and epoch == 0:
+    if phase == 'train' and epoch == 0 and fold == 0:
+        csv_header = csv_header + csv_test_header
         write_csv(csv_header, 'w')
 
     print("{}: {}".format(phase, ", ".join(outputs)))
 
     return csv_metrics
 
-def write_csv(data, mode='a'):
-    with open('logs.csv',mode, newline='') as csv_file:
+def write_csv(data, mode='a', filename='logs.csv'):
+    with open(filename, mode, newline='') as csv_file:
         writer = csv.writer(csv_file)
         writer.writerows([data])
 
-def get_data_loaders(dataset_path, mask_path, seed=None):
+def get_data_loaders(dataset_path, mask_path, seed=None, fold_split=10):
     # use the same transformations for train/val in this example
+    # Fod edge combined imgaes
     raw = list(filter(lambda l: not l.endswith('edge_mask.png'), os.listdir(mask_path)))
-    input_imgs = list(filter(lambda l: not l.endswith('mask.png'), raw))
-    # input_imgs = list(filter(lambda l: l.endswith('.npy'), os.listdir(dataset_path)))
+    # input_imgs = list(filter(lambda l: not l.endswith('mask.png'), raw))
+    input_imgs = list(filter(lambda l: l.endswith('.npy'), os.listdir(dataset_path)))
     mask_imgs = list(filter(lambda l: l.endswith('mask.png'), raw))
 
     input_imgs.sort()
@@ -97,39 +100,41 @@ def get_data_loaders(dataset_path, mask_path, seed=None):
 
     input_imgs_paths = list(map(lambda p: os.path.join(dataset_path, p), input_imgs))
     mask_imgs_paths = list(map(lambda p: os.path.join(mask_path, p), mask_imgs))
+    kf = KFold(n_splits=fold_split)
 
     train_inputs, validation_inputs, train_masks, validation_masks = train_test_split(input_imgs_paths, mask_imgs_paths, test_size=0.2, shuffle=True, random_state=seed)
-    train_inputs, test_inputs, train_masks, test_masks = train_test_split(train_inputs, train_masks, test_size=0.3, shuffle=True, random_state=seed)
-    print(len(train_inputs), len(test_inputs), len(validation_inputs))
+    folds = kf.split(train_inputs)
+    print(len(train_inputs), len(validation_inputs))
 
     trans = transforms.Compose([
         transforms.ToTensor(),
         transforms.Normalize([0.485, 0.456, 0.406], [0.229, 0.224, 0.225]) # imagenet
     ])
 
-    train_set = LIDCDataset(train_inputs,train_masks)
-    test_set = LIDCDataset(test_inputs,test_masks)
     validation_set = LIDCDataset(validation_inputs,validation_masks)
 
-    image_datasets = {
-        'train': train_set, 'test': test_set, 'validation': validation_set
-    }
+    # image_datasets = {
+    #     'train': train_set, 'test': test_set, 'validation': validation_set
+    # }
 
     batch_size = 1
 
     dataloaders = {
-        'train': DataLoader(train_set, batch_size=batch_size, shuffle=True, num_workers=0),
-        'test': DataLoader(test_set, batch_size=batch_size, shuffle=True, num_workers=0),
-        'validation': DataLoader(validation_set, batch_size=batch_size, shuffle=True, num_workers=0)
+        'validation': DataLoader(validation_set, batch_size=batch_size, shuffle=False, num_workers=0)
     }
+    for i, (t1,t2) in enumerate(folds):
+        dataloaders[f"k_{i}"] = {
+            'train': DataLoader(LIDCDataset(list(map(lambda inp: train_inputs[inp], t1)),list(map(lambda inp: train_masks[inp], t1))), batch_size=batch_size, shuffle=True, num_workers=0),
+            'test': DataLoader(LIDCDataset(list(map(lambda inp: train_inputs[inp], t2)),list(map(lambda inp: train_masks[inp], t2))), batch_size=batch_size, shuffle=True, num_workers=0),
+        }
 
     return dataloaders
 
-def train_model(model, optimizer, scheduler, dataset_path, num_epochs=25, mask_path=None, seed=None):
+def train_model(model, optimizer, scheduler, dataset_path, num_epochs=25, mask_path=None, seed=None, fold_split=10):
     if mask_path == None:
-        dataloaders = get_data_loaders(dataset_path=dataset_path, mask_path=dataset_path, seed=seed)
+        dataloaders = get_data_loaders(dataset_path=dataset_path, mask_path=dataset_path, seed=seed, fold_split=fold_split)
     else:
-        dataloaders = get_data_loaders(dataset_path=dataset_path, mask_path=mask_path, seed=seed)
+        dataloaders = get_data_loaders(dataset_path=dataset_path, mask_path=mask_path, seed=seed,fold_split=fold_split)
     device = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
     best_model_wts = copy.deepcopy(model.state_dict())
     best_loss = 1e10
@@ -143,61 +148,67 @@ def train_model(model, optimizer, scheduler, dataset_path, num_epochs=25, mask_p
         print('-' * 10)
 
         csv_metrics = []
+        best_csv_metrics = []
         since = time.time()
 
-        # Each epoch has a training and validation phase
-        for phase in ['train', 'test']:
-            if phase == 'train':
-                for param_group in optimizer.param_groups:
-                    print("LR", param_group['lr'])
+        for i in range(fold_split):
+            print(f"Fold: {i}")
+            # Each epoch has a training and validation phase
+            for phase in ['train', 'test']:
+                if phase == 'train':
+                    for param_group in optimizer.param_groups:
+                        print("LR", param_group['lr'])
 
-                model.train()  # Set model to training mode
-            else:
-                model.eval()  # Set model to evaluate mode
+                    model.train()  # Set model to training mode
+                else:
+                    model.eval()  # Set model to evaluate mode
 
-            metrics = defaultdict(float)
-            epoch_samples = 0
+                metrics = defaultdict(float)
+                epoch_samples = 0
 
-            for inputs, masks in dataloaders[phase]:
-                inputs = inputs.float().to(device)
-                masks = masks.float().to(device)
+                for inputs, masks in dataloaders[f"k_{i}"][phase]:
+                    inputs = inputs.float().to(device)
+                    masks = masks.float().to(device)
 
-                # zero the parameter gradients
-                optimizer.zero_grad()
-
-                # forward
-                # track history if only in train
-                with torch.set_grad_enabled(phase == 'train'):
-                    outputs = model(inputs)
+                    # zero the parameter gradients
                     optimizer.zero_grad()
-                    loss = calc_loss(outputs, masks, metrics)
 
-                    # backward + optimize only if in training phase
-                    if phase == 'train':
-                        scaler.scale(loss).backward()
-                        scaler.step(optimizer)
-                        scaler.update()
+                    # forward
+                    # track history if only in train
+                    with torch.set_grad_enabled(phase == 'train'):
+                        outputs = model(inputs)
+                        optimizer.zero_grad()
+                        loss = calc_loss(outputs, masks, metrics)
 
-                # statistics
-                epoch_samples += inputs.size(0)
+                        # backward + optimize only if in training phase
+                        if phase == 'train':
+                            scaler.scale(loss).backward()
+                            scaler.step(optimizer)
+                            scaler.update()
 
-            if phase == 'train':
-                csv_metrics = print_metrics(metrics, epoch_samples, phase, epoch)
-            else:
-                test_metrics = print_metrics(metrics, epoch_samples, phase, epoch)
-                csv_metrics = np.concatenate(([epoch], csv_metrics, test_metrics))
-            epoch_loss = metrics['loss'] / epoch_samples
+                    # statistics
+                    epoch_samples += inputs.size(0)
 
-            # deep copy the model
-            if phase == 'test' and epoch_loss < best_loss:
-                print("saving best model")
-                best_loss = epoch_loss
-                best_model_wts = copy.deepcopy(model.state_dict())
+                if phase == 'train':
+                    csv_metrics = print_metrics(metrics, epoch_samples, phase, epoch, i)
+                else:
+                    test_metrics = print_metrics(metrics, epoch_samples, phase, epoch, i)
+                    csv_metrics = np.concatenate(([epoch, i], csv_metrics, test_metrics))
+                epoch_loss = metrics['loss'] / epoch_samples
+
+                # deep copy the model
+                if phase == 'test' and epoch_loss < best_loss:
+                    print("saving best model")
+                    # best_csv_metrics = csv_metrics
+                    best_loss = epoch_loss
+                    best_model_wts = copy.deepcopy(model.state_dict())
+
+            write_csv(csv_metrics)
 
         scheduler.step()
         time_elapsed = time.time() - since
         print('{:.0f}m {:.0f}s'.format(time_elapsed // 60, time_elapsed % 60))
-        write_csv(csv_metrics)
+        # write_csv(best_csv_metrics)
 
     print('Best val loss: {:4f}'.format(best_loss))
 
@@ -208,19 +219,26 @@ def train_model(model, optimizer, scheduler, dataset_path, num_epochs=25, mask_p
 def main():
     print("Starting the model")
 
+    seed = 42
+    input_dimensions = 2
     num_classes = 1
-    epochs = 200
+    epochs = 1
+    folds = 10
+
+    # For edge compose trainings
     dataset_path = './support_images/dataset/raw'
     mask_path = './support_images/dataset/raw'
+
+    # For regular sets training
     # dataset_path = '/run/media/jpolonip/JP2-HD/MestradoFiles/Dataset/raw2/train'
     device = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
 
-    model = UNet(in_channels=1, out_channels=num_classes).to(device)
+    model = UNet(in_channels=input_dimensions, out_channels=num_classes).to(device)
     optimizer_ft = optim.Adam(filter(lambda p: p.requires_grad, model.parameters()), lr=1e-5)
 
     exp_lr_scheduler = lr_scheduler.StepLR(optimizer_ft, step_size=30, gamma=0.1)
 
-    model, dataloaders = train_model(model, optimizer_ft, exp_lr_scheduler, num_epochs=epochs, dataset_path=dataset_path, mask_path=mask_path, seed=123)
+    model, dataloaders = train_model(model, optimizer_ft, exp_lr_scheduler, num_epochs=epochs, dataset_path=dataset_path, mask_path=mask_path, seed=seed, fold_split=folds)
 
     model.eval()
     i = 1
