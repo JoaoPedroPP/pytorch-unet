@@ -13,8 +13,11 @@ class LIDCDataset(Dataset):
         return len(self.imgs)
 
     def __getitem__(self, idx):
-        # image = decode_image(self.imgs[idx], mode='GRAY')
-        image = np.load(self.imgs[idx])
+        # For regular input images
+        image = decode_image(self.imgs[idx], mode='GRAY')
+
+        # For npy 2 dim images
+        # image = np.load(self.imgs[idx])
         if self.transform:
             image = self.transform(image)
         mask = decode_image(self.masks[idx], mode='GRAY').div(255)

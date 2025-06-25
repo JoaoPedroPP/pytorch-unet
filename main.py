@@ -91,8 +91,11 @@ def get_data_loaders(dataset_path, mask_path, seed=None, fold_split=10):
     # use the same transformations for train/val in this example
     # Fod edge combined imgaes
     raw = list(filter(lambda l: not l.endswith('edge_mask.png'), os.listdir(mask_path)))
-    # input_imgs = list(filter(lambda l: not l.endswith('mask.png'), raw))
-    input_imgs = list(filter(lambda l: l.endswith('.npy'), os.listdir(dataset_path)))
+    # For regular input images
+    input_imgs = list(filter(lambda l: not l.endswith('mask.png'), raw))
+
+    # For npy 2 dim images
+    # input_imgs = list(filter(lambda l: l.endswith('.npy'), os.listdir(dataset_path)))
     mask_imgs = list(filter(lambda l: l.endswith('mask.png'), raw))
 
     input_imgs.sort()
@@ -220,7 +223,7 @@ def main():
     print("Starting the model")
 
     seed = 42
-    input_dimensions = 2
+    input_dimensions = 1
     num_classes = 1
     epochs = 1
     folds = 10
