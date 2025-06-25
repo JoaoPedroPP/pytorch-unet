@@ -92,10 +92,10 @@ def get_data_loaders(dataset_path, mask_path, seed=None, fold_split=10):
     # Fod edge combined imgaes
     raw = list(filter(lambda l: not l.endswith('edge_mask.png'), os.listdir(mask_path)))
     # For regular input images
-    input_imgs = list(filter(lambda l: not l.endswith('mask.png'), raw))
+    # input_imgs = list(filter(lambda l: not l.endswith('mask.png'), raw))
 
     # For npy 2 dim images
-    # input_imgs = list(filter(lambda l: l.endswith('.npy'), os.listdir(dataset_path)))
+    input_imgs = list(filter(lambda l: l.endswith('.npy'), os.listdir(dataset_path)))
     mask_imgs = list(filter(lambda l: l.endswith('mask.png'), raw))
 
     input_imgs.sort()
@@ -223,13 +223,13 @@ def main():
     print("Starting the model")
 
     seed = 42
-    input_dimensions = 1
+    input_dimensions = 2
     num_classes = 1
     epochs = 1
     folds = 10
 
     # For edge compose trainings
-    dataset_path = './support_images/dataset/raw'
+    dataset_path = './support_images/dataset/raw2'
     mask_path = './support_images/dataset/raw'
 
     # For regular sets training
