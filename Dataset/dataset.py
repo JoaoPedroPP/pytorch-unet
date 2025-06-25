@@ -14,10 +14,10 @@ class LIDCDataset(Dataset):
 
     def __getitem__(self, idx):
         # For regular input images
-        image = decode_image(self.imgs[idx], mode='GRAY')
+        # image = decode_image(self.imgs[idx], mode='GRAY')
 
         # For npy 2 dim images
-        # image = np.load(self.imgs[idx])
+        image = np.load(self.imgs[idx])
         if self.transform:
             image = self.transform(image)
         mask = decode_image(self.masks[idx], mode='GRAY').div(255)
