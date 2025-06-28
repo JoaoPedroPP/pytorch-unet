@@ -152,6 +152,7 @@ def train_model(model, optimizer, scheduler, dataset_path, num_epochs=25, mask_p
 
         csv_metrics = []
         best_csv_metrics = []
+        fold_metrics = []
         since = time.time()
 
         for i in range(fold_split):
@@ -200,11 +201,12 @@ def train_model(model, optimizer, scheduler, dataset_path, num_epochs=25, mask_p
                 epoch_loss = metrics['loss'] / epoch_samples
 
                 # deep copy the model
-                if phase == 'test' and epoch_loss < best_loss:
-                    print("saving best model")
+                if phase == 'test':
+                    # print("saving best model")
                     # best_csv_metrics = csv_metrics
-                    best_loss = epoch_loss
-                    best_model_wts = copy.deepcopy(model.state_dict())
+                    # best_loss = epoch_loss
+                    fold_metrics.append(epoch_loss)
+                    # best_model_wts = copy.deepcopy(model.state_dict())
 
             write_csv(csv_metrics)
 
@@ -212,6 +214,11 @@ def train_model(model, optimizer, scheduler, dataset_path, num_epochs=25, mask_p
         time_elapsed = time.time() - since
         print('{:.0f}m {:.0f}s'.format(time_elapsed // 60, time_elapsed % 60))
         # write_csv(best_csv_metrics)
+        # deep copy the model
+        fold_metrics = np.array(fold_metrics)
+        if fold_metrics.mean() < best_loss:
+            best_loss = fold_metrics.mean()
+            best_model_wts = copy.deepcopy(model.state_dict())
 
     print('Best val loss: {:4f}'.format(best_loss))
 
@@ -225,7 +232,7 @@ def main():
     seed = 42
     input_dimensions = 1
     num_classes = 1
-    epochs = 1
+    epochs = 200
     folds = 10
 
     # For edge compose trainings
