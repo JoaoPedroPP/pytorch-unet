@@ -236,8 +236,10 @@ def main():
     folds = 10
 
     # For edge compose trainings
+    # raw = Imagem tradional raw2 = informacao de borda
     dataset_path = './support_images/dataset/raw'
     mask_path = './support_images/dataset/raw'
+    # mask_path = None
 
     # For regular sets training
     # dataset_path = '/run/media/jpolonip/JP2-HD/MestradoFiles/Dataset/raw2/train'

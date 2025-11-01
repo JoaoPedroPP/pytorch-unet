@@ -6,7 +6,7 @@ Builda o container
 - `podman build -t unet -f ContainerFile .`
 
 Cria um volume e le as imagebs em `support_images/`
-- `podman run -it -v ./support_images:/usr/app/support_images:z unet`
+- `podman run -it -v ./support_images:/usr/app/support_images:z -v ./logs.csv:/usr/app/logs.csv:z unet`
 
 ## Esttrutura de arquivos
 

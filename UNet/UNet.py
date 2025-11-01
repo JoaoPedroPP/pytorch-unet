@@ -50,18 +50,30 @@ class UNet(nn.Module):
     def __init__(self, in_channels, out_channels):
         super().__init__()
 
+        # Original
         down_conv_sizes = [(in_channels, 64), (64, 128), (128, 256), (256, 512)]
+        # Without the last layer
+        # down_conv_sizes = [(in_channels, 64), (64, 128), (128, 256)]
         self.down_conv = nn.ModuleList([DoubleConvolution(i, o) for i,o in down_conv_sizes])
 
         self.down_sample = nn.ModuleList([DownSample() for _ in range(4)])
 
+        # Original
         self.middle_conv = DoubleConvolution(512, 1024)
+        # Without the last layer
+        # self.middle_conv = DoubleConvolution(256, 512)
 
+        # Original
         upsample_sizes = [(1024, 512), (512, 256), (256, 128), (128, 64)]
+        # Without the last layer
+        # upsample_sizes = [(512, 256), (256, 128), (128, 64)]
 
         self.up_sample = nn.ModuleList([UpSample(i, o) for i, o in upsample_sizes])
 
+        # Original
         up_conv_sizes = [(1024, 512), (512, 256), (256, 128), (128, 64)]
+        # Without the last layer
+        # up_conv_sizes = [(512, 256), (256, 128), (128, 64)]
         self.up_conv = nn.ModuleList([DoubleConvolution(i, o) for i, o in up_conv_sizes])
 
         self.concat = nn.ModuleList([CropAndConcatenate() for _ in range(4)])
