@@ -8,5 +8,6 @@ RUN pip install -r requirements.txt
 COPY Dataset Dataset
 COPY UNet UNet
 COPY main.py .
+COPY unet-run.py .
 
-CMD ["python", "main.py"]
+ENTRYPOINT ["python", "unet-run.py"]

@@ -3,9 +3,10 @@ from torch.utils.data import Dataset
 from torchvision.io import decode_image
 
 class LIDCDataset(Dataset):
-    def __init__(self, imgs, masks, transform=None, target_transform=None):
+    def __init__(self, imgs, masks, dims=1, transform=None, target_transform=None):
         self.imgs = imgs
         self.masks = masks
+        self.dims = dims
         self.transform = transform
         self.target_transform = target_transform
 
@@ -14,10 +15,12 @@ class LIDCDataset(Dataset):
 
     def __getitem__(self, idx):
         # For regular input images
-        image = decode_image(self.imgs[idx], mode='GRAY')
+        if self.dims == 1:
+            image = decode_image(self.imgs[idx], mode='GRAY')
 
         # For npy 2 dim images
-        # image = np.load(self.imgs[idx])
+        if self.dims == 2:
+            image = np.load(self.imgs[idx])
         if self.transform:
             image = self.transform(image)
         mask = decode_image(self.masks[idx], mode='GRAY').div(255)

@@ -87,15 +87,16 @@ def write_csv(data, mode='a', filename='logs.csv'):
         writer = csv.writer(csv_file)
         writer.writerows([data])
 
-def get_data_loaders(dataset_path, mask_path, seed=None, fold_split=10):
+def get_data_loaders(dataset_path, mask_path, input_dimensions, seed=None, fold_split=10):
     # use the same transformations for train/val in this example
     # Fod edge combined imgaes
     raw = list(filter(lambda l: not l.endswith('edge_mask.png'), os.listdir(mask_path)))
     # For regular input images
-    input_imgs = list(filter(lambda l: not l.endswith('mask.png'), raw))
-
-    # For npy 2 dim images
-    # input_imgs = list(filter(lambda l: l.endswith('.npy'), os.listdir(dataset_path)))
+    if input_dimensions == 1:
+        input_imgs = list(filter(lambda l: not l.endswith('mask.png'), raw))
+    else:
+        # For npy 2 dim images
+        input_imgs = list(filter(lambda l: l.endswith('.npy'), os.listdir(dataset_path)))
     mask_imgs = list(filter(lambda l: l.endswith('mask.png'), raw))
 
     input_imgs.sort()
@@ -114,7 +115,7 @@ def get_data_loaders(dataset_path, mask_path, seed=None, fold_split=10):
         transforms.Normalize([0.485, 0.456, 0.406], [0.229, 0.224, 0.225]) # imagenet
     ])
 
-    validation_set = LIDCDataset(validation_inputs,validation_masks)
+    validation_set = LIDCDataset(validation_inputs,validation_masks, dims=input_dimensions)
 
     # image_datasets = {
     #     'train': train_set, 'test': test_set, 'validation': validation_set
@@ -127,17 +128,17 @@ def get_data_loaders(dataset_path, mask_path, seed=None, fold_split=10):
     }
     for i, (t1,t2) in enumerate(folds):
         dataloaders[f"k_{i}"] = {
-            'train': DataLoader(LIDCDataset(list(map(lambda inp: train_inputs[inp], t1)),list(map(lambda inp: train_masks[inp], t1))), batch_size=batch_size, shuffle=True, num_workers=0),
-            'test': DataLoader(LIDCDataset(list(map(lambda inp: train_inputs[inp], t2)),list(map(lambda inp: train_masks[inp], t2))), batch_size=batch_size, shuffle=True, num_workers=0),
+            'train': DataLoader(LIDCDataset(list(map(lambda inp: train_inputs[inp], t1)),list(map(lambda inp: train_masks[inp], t1)), dims=input_dimensions), batch_size=batch_size, shuffle=True, num_workers=0),
+            'test': DataLoader(LIDCDataset(list(map(lambda inp: train_inputs[inp], t2)),list(map(lambda inp: train_masks[inp], t2)), dims=input_dimensions), batch_size=batch_size, shuffle=True, num_workers=0),
         }
 
     return dataloaders
 
-def train_model(model, optimizer, scheduler, dataset_path, num_epochs=25, mask_path=None, seed=None, fold_split=10):
+def train_model(model, optimizer, scheduler, dataset_path, input_dimensions, num_epochs=25, mask_path=None, seed=None, fold_split=10):
     if mask_path == None:
-        dataloaders = get_data_loaders(dataset_path=dataset_path, mask_path=dataset_path, seed=seed, fold_split=fold_split)
+        dataloaders = get_data_loaders(dataset_path=dataset_path, mask_path=dataset_path, input_dimensions=input_dimensions, seed=seed, fold_split=fold_split)
     else:
-        dataloaders = get_data_loaders(dataset_path=dataset_path, mask_path=mask_path, seed=seed,fold_split=fold_split)
+        dataloaders = get_data_loaders(dataset_path=dataset_path, mask_path=mask_path, input_dimensions=input_dimensions, seed=seed,fold_split=fold_split)
     device = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
     best_model_wts = copy.deepcopy(model.state_dict())
     best_loss = 1e10
@@ -226,20 +227,17 @@ def train_model(model, optimizer, scheduler, dataset_path, num_epochs=25, mask_p
     model.load_state_dict(best_model_wts)
     return model, dataloaders
 
-def main():
+def main(seed=42, input_dimensions=1, num_classes=1, epochs=200, folds=10, dataset_path="./support_images/dataset/raw", mask_path="./support_images/dataset/raw"):
     print("Starting the model")
 
-    seed = 42
-    input_dimensions = 1
-    num_classes = 1
-    epochs = 200
-    folds = 10
 
     # For edge compose trainings
     # raw = Imagem tradional raw2 = informacao de borda
-    dataset_path = './support_images/dataset/raw'
-    mask_path = './support_images/dataset/raw'
+    # dataset_path = './support_images/dataset/raw'
+    # mask_path = './support_images/dataset/raw'
     # mask_path = None
+    if input_dimensions == 2:
+        dataset_path = './support_images/dataset/raw2'
 
     # For regular sets training
     # dataset_path = '/run/media/jpolonip/JP2-HD/MestradoFiles/Dataset/raw2/train'
@@ -250,7 +248,7 @@ def main():
 
     exp_lr_scheduler = lr_scheduler.StepLR(optimizer_ft, step_size=30, gamma=0.1)
 
-    model, dataloaders = train_model(model, optimizer_ft, exp_lr_scheduler, num_epochs=epochs, dataset_path=dataset_path, mask_path=mask_path, seed=seed, fold_split=folds)
+    model, dataloaders = train_model(model, optimizer_ft, exp_lr_scheduler, input_dimensions=input_dimensions, num_epochs=epochs, dataset_path=dataset_path, mask_path=mask_path, seed=seed, fold_split=folds)
 
     model.eval()
     i = 1
@@ -278,4 +276,4 @@ def main():
 
 
 
-main()
+# main()

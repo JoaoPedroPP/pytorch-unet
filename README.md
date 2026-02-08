@@ -6,15 +6,74 @@ Builda o container
 - `podman build -t unet -f ContainerFile .`
 
 Cria um volume e le as imagebs em `support_images/`
-- `podman run -it -v ./support_images:/usr/app/support_images:z -v ./logs.csv:/usr/app/logs.csv:z unet`
+- `podman run -it -v ./support_images:/usr/app/support_images:z -v ./logs.csv:/usr/app/logs.csv:z unet run <CLI comamnds>`
 
-## Esttrutura de arquivos
+## Estrutura de arquivos
 
 As imagens de treinamento devem ser armazenadas em [support_images/dataset/raw](./support_images/dataset/raw/). Caso queira utilizar um diretório diferente é necessário atualizar [main.py#L229-L230](./main.py) com os caminho correto.
 
 ## Output
 
-A imagem gerada por essa U-Net sempre será uma imagem binária, no entando a entrada pode variar. Essa rede esta preparada para receber uma imagem com uma(imagem em tom de cinza), ou duas(imagem em tom de cinza mais informação da borda). Para selecionar qual do tipos utilizar é necessario atualizar o arquivo [main.py#L223]
+A imagem gerada por essa U-Net sempre será uma imagem binária, no entando a entrada pode variar. Essa rede esta preparada para receber uma imagem com uma(imagem em tom de cinza), ou duas(imagem em tom de cinza mais informação da borda). Para selecionar qual do tipos utilizar é necessario atualizar o arquivo [main.py#L223](./main.py#L223)
+
+## Comandos da CLI
+
+A CLI é executada através do script `unet-run.py`. O comando principal é:
+
+```bash
+python unet-run.py <ação> [opções]
+```
+
+### Ações disponíveis
+
+| Ação | Descrição |
+|------|-----------|
+| `run` | Executa o treinamento da U-Net |
+| `config-dataset` | Configura o dataset (em desenvolvimento) |
+
+### Opções
+
+| Opção | Tipo | Padrão | Descrição |
+|-------|------|--------|-----------|
+| `--seed` | int | 42 | Semente aleatória para reprodutibilidade |
+| `--dims` | int | 1 | Número de dimensões de entrada (canais). Use 1 para imagem em tom de cinza ou 2 para imagem com informação de borda |
+| `--classes` | int | 1 | Número de classes de saída |
+| `--epochs` | int | 200 | Número de épocas de treinamento |
+| `--folds` | int | 10 | Número de folds para validação cruzada (K-Fold) |
+| `--dataset-path` | str | `./support_images/dataset/raw` | Caminho para o diretório do dataset |
+| `--mask-path` | str | `./support_images/dataset/raw` | Caminho para o diretório das máscaras |
+
+### Exemplos de uso
+
+Treinamento básico com parâmetros padrão:
+
+```bash
+python unet-run.py run
+```
+
+Treinamento com 200 épocas e 10 folds:
+
+```bash
+python unet-run.py run --epochs 100 --folds 5
+```
+
+Treinamento com imagem de 2 canais (tom de cinza + borda):
+
+```bash
+python unet-run.py run --dims 2
+```
+
+Treinamento especificando caminhos personalizados:
+
+```bash
+python unet-run.py run --dataset-path /caminho/para/dataset --mask-path /caminho/para/mascaras
+```
+
+Utilizando com container:
+
+```bash
+podman run -it -v ./support_images:/usr/app/support_images:z -v ./logs.csv:/usr/app/logs.csv:z unet run --epochs 100 --folds 5
+```
 
 ## License
 
