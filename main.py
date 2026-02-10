@@ -227,7 +227,7 @@ def train_model(model, optimizer, scheduler, dataset_path, input_dimensions, num
     model.load_state_dict(best_model_wts)
     return model, dataloaders
 
-def main(seed=42, input_dimensions=1, num_classes=1, epochs=200, folds=10, dataset_path="./support_images/dataset/raw", mask_path="./support_images/dataset/raw"):
+def main(seed=42, input_dimensions=1, num_classes=1, epochs=200, folds=10, dataset_path="./support_images/dataset/raw", mask_path="./support_images/dataset/raw", simple=False):
     print("Starting the model")
 
 
@@ -243,7 +243,7 @@ def main(seed=42, input_dimensions=1, num_classes=1, epochs=200, folds=10, datas
     # dataset_path = '/run/media/jpolonip/JP2-HD/MestradoFiles/Dataset/raw2/train'
     device = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
 
-    model = UNet(in_channels=input_dimensions, out_channels=num_classes).to(device)
+    model = UNet(in_channels=input_dimensions, out_channels=num_classes, simple=simple).to(device)
     optimizer_ft = optim.Adam(filter(lambda p: p.requires_grad, model.parameters()), lr=1e-5)
 
     exp_lr_scheduler = lr_scheduler.StepLR(optimizer_ft, step_size=30, gamma=0.1)
