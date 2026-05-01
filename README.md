@@ -42,6 +42,7 @@ python unet-run.py <ação> [opções]
 | `--folds` | int | 10 | Número de folds para validação cruzada (K-Fold) |
 | `--dataset-path` | str | `./support_images/dataset/raw` | Caminho para o diretório do dataset |
 | `--mask-path` | str | `./support_images/dataset/raw` | Caminho para o diretório das máscaras |
+| `--simple` | flag | False | Utiliza a versão simplificada da U-Net |
 
 ### Exemplos de uso
 
