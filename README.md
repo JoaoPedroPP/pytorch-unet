@@ -43,6 +43,7 @@ python unet-run.py <ação> [opções]
 | `--dataset-path` | str | `./support_images/dataset/raw` | Caminho para o diretório do dataset |
 | `--mask-path` | str | `./support_images/dataset/raw` | Caminho para o diretório das máscaras |
 | `--simple` | flag | False | Utiliza a versão simplificada da U-Net |
+| `--simple-less-layers` | flag | False | Utiliza a versão simplificada da U-Net com menos camadas |
 
 ### Exemplos de uso
 
