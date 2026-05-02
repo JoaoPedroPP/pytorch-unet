@@ -245,7 +245,7 @@ def main(seed=42, input_dimensions=1, num_classes=1, epochs=200, folds=5, datase
     # mask_path = './support_images/dataset/raw'
     # mask_path = None
     # if input_dimensions == 2:
-    #     dataset_path = './support_images/dataset/sample2'
+    #     dataset_path = './support_images/dataset/raw2'
 
     # For regular sets training
     # dataset_path = '/run/media/jpolonip/JP2-HD/MestradoFiles/Dataset/raw2/train'
