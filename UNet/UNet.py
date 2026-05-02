@@ -47,7 +47,7 @@ class CropAndConcatenate(nn.Module):
         return x
 
 class UNet(nn.Module):
-    def __init__(self, in_channels, out_channels, simple=False):
+    def __init__(self, in_channels, out_channels, simple=False, simple_less_layers=False):
         super().__init__()
 
         # Original
@@ -55,6 +55,9 @@ class UNet(nn.Module):
         # Without the last layer
         if simple:
             down_conv_sizes = [(in_channels, 64), (64, 128), (128, 256)]
+        # One more layer reducing complexity
+        elif simple_less_layers:
+            down_conv_sizes = [(in_channels, 32), (32, 64), (64, 128), (128, 256)]
         self.down_conv = nn.ModuleList([DoubleConvolution(i, o) for i,o in down_conv_sizes])
 
         self.down_sample = nn.ModuleList([DownSample() for _ in range(len(down_conv_sizes))])
@@ -63,26 +66,35 @@ class UNet(nn.Module):
         self.middle_conv = DoubleConvolution(512, 1024)
         # Without the last layer
         if simple:
-            self.middle_conv = DoubleConvolution(256, 512)
+           self.middle_conv = DoubleConvolution(256, 512)
 
         # Original
         upsample_sizes = [(1024, 512), (512, 256), (256, 128), (128, 64)]
         # Without the last layer
         if simple:
             upsample_sizes = [(512, 256), (256, 128), (128, 64)]
-
+        # One more layer reducing complexity
+        elif simple_less_layers:
+            upsample_sizes = [(512, 256), (256, 128), (128, 64), (64, 32)]
         self.up_sample = nn.ModuleList([UpSample(i, o) for i, o in upsample_sizes])
 
         # Original
         up_conv_sizes = [(1024, 512), (512, 256), (256, 128), (128, 64)]
         # Without the last layer
         if simple:
-            up_conv_sizes = [(512, 256), (256, 128), (128, 64)]
+           up_conv_sizes = [(512, 256), (256, 128), (128, 64)]
+        # One more layer reducing complexity
+        elif simple_less_layers:
+           up_conv_sizes = [(512, 256), (256, 128), (128, 64), (64, 32)]
         self.up_conv = nn.ModuleList([DoubleConvolution(i, o) for i, o in up_conv_sizes])
 
         self.concat = nn.ModuleList([CropAndConcatenate() for _ in range(len(up_conv_sizes))])
 
-        self.final_conv = nn.Conv2d(64, out_channels, kernel_size=1)
+        # self.final_conv = nn.Conv2d(64, out_channels, kernel_size=1)
+        if simple_less_layers:
+           self.final_conv = nn.Conv2d(32, out_channels, kernel_size=1)
+        else:
+           self.final_conv = nn.Conv2d(64, out_channels, kernel_size=1)
         # self.final_activation = nn.Softmax(dim=out_channels)
 
     def forward(self, x: torch.Tensor):
