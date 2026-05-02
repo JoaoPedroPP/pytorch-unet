@@ -5,16 +5,16 @@
 Builda o container
 - `podman build -t unet -f ContainerFile .`
 
-Cria um volume e le as imagebs em `support_images/`
-- `podman run -it -v ./support_images:/usr/app/support_images:z -v ./logs.csv:/usr/app/logs.csv:z unet run <CLI comamnds>`
+Cria um volume e lê as imagens em `support_images/`
+- `podman run -it -v ./support_images:/usr/app/support_images:z -v ./logs.csv:/usr/app/logs.csv:z unet run <comandos da CLI>`
 
 ## Estrutura de arquivos
 
-As imagens de treinamento devem ser armazenadas em [support_images/dataset/raw](./support_images/dataset/raw/). Caso queira utilizar um diretório diferente é necessário atualizar [main.py#L229-L230](./main.py) com os caminho correto.
+As imagens de treinamento devem ser armazenadas em [support_images/dataset/raw](./support_images/dataset/raw/). Para outro diretório, use `--dataset-path` e `--mask-path`. Com `--dims 2`, o dataset de entrada é fixado em `./support_images/dataset/raw2` dentro de `main.py` (o `--dataset-path` não se aplica nesse modo).
 
 ## Output
 
-A imagem gerada por essa U-Net sempre será uma imagem binária, no entando a entrada pode variar. Essa rede esta preparada para receber uma imagem com uma(imagem em tom de cinza), ou duas(imagem em tom de cinza mais informação da borda). Para selecionar qual do tipos utilizar é necessario atualizar o arquivo [main.py#L223](./main.py#L223)
+A imagem gerada por essa U-Net sempre será binária; a entrada pode ter um canal (tom de cinza) ou dois (cinza + informação de borda). Use `--dims 1` ou `--dims 2` na CLI.
 
 ## Comandos da CLI
 
@@ -44,6 +44,8 @@ python unet-run.py <ação> [opções]
 | `--mask-path` | str | `./support_images/dataset/raw` | Caminho para o diretório das máscaras |
 | `--simple` | flag | False | Utiliza a versão simplificada da U-Net |
 | `--simple-less-layers` | flag | False | Utiliza a versão simplificada da U-Net com menos camadas |
+| `--loss-type` | str | `dice` | Função de perda: `dice`, `bce` ou `dice_bce` |
+| `--swap` | float | `0.5` | Com `dice_bce`, fração do progresso das épocas (0–1) após a qual a perda passa de Dice para BCE |
 
 ### Exemplos de uso
 
@@ -53,7 +55,7 @@ Treinamento básico com parâmetros padrão:
 python unet-run.py run
 ```
 
-Treinamento com 200 épocas e 10 folds:
+Treinamento com menos épocas e folds:
 
 ```bash
 python unet-run.py run --epochs 100 --folds 5
@@ -71,11 +73,24 @@ Treinamento especificando caminhos personalizados:
 python unet-run.py run --dataset-path /caminho/para/dataset --mask-path /caminho/para/mascaras
 ```
 
+Treinamento com perda BCE ou combinação Dice/BCE:
+
+```bash
+python unet-run.py run --loss-type bce
+python unet-run.py run --loss-type dice_bce --swap 0.5
+```
+
 Utilizando com container:
 
 ```bash
 podman run -it -v ./support_images:/usr/app/support_images:z -v ./logs.csv:/usr/app/logs.csv:z unet run --epochs 100 --folds 5
 ```
+
+## Experimento
+
+Este repositório foi concebido como forma de executar uma série de experimentos para um programa de mestrado, logo os principais _scripts_ desse repositório constituem a implementação da U-Net. No entanto para facilitar a execução e reprodução do experimentos foram criados dois novos _scripts_: [experiment.sh](./experiment.sh) e [experiments.py](./experiments.py). Em [experiment.sh](./experiment.sh) e possível executar os experimento em python ou através de containers. Em [experiments.py](./experiments.py) o _script_ lê os parâmetos de [Experimentos.yaml](./Experimentos.yaml) e executa todos conforme descrito.
+
+Qualquer alteração dos experimentos é melhor rastreada através desses _scripts_.
 
 ## License
 
