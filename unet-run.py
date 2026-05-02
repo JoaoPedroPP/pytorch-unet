@@ -16,6 +16,8 @@ def main():
     parser.add_argument("--mask-path", type=str, default="./support_images/dataset/raw", help="Caminho para o diretório das máscaras")
     parser.add_argument("--simple", action="store_true", help="Utiliza a versão simplificada da U-Net")
     parser.add_argument("--simple-less-layers", action="store_true", help="Utiliza a versão simplificada da U-Net com menos camadas")
+    parser.add_argument("--loss-type", type=str, default="dice", choices=["dice", "bce", "dice_bce"], help="Tipo de função de perda")
+    parser.add_argument("--swap", type=float, default=0.5, help="Valor de troca para função de perda dice_bce")
 
     args = parser.parse_args()
     if "run" in args.acao:
@@ -29,6 +31,8 @@ def main():
             mask_path=args.mask_path,
             simple=args.simple,
             simple_less_layers=args.simple_less_layers,
+            loss_type=args.loss_type,
+            swap=args.swap
         )
 
 if __name__ == "__main__":

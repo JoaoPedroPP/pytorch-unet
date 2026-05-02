@@ -29,12 +29,22 @@ def dice(pred, target, smooth=1.):
 
     return loss.mean()
 
-def calc_loss(pred, target, metrics):
+def calc_loss(pred, target, metrics, loss_type='dice', swap=0.5, epoch=0):
     pred = F.sigmoid(pred)
 
     dice_coef = dice(pred, target)
-    loss = 1 - dice_coef
     bce = F.binary_cross_entropy_with_logits(pred, target)
+    bce = F.binary_cross_entropy(pred, target)
+
+    if loss_type == 'dice':
+        loss = 1 - dice_coef
+    if loss_type == 'bce':
+        loss = bce
+    if loss_type == 'dice_bce':
+        if epoch >= swap:
+            loss = bce
+        else:
+            loss = 1 - dice_coef
 
     pred_flatten = pred.flatten()
     target_flatten = target.flatten()
@@ -134,7 +144,7 @@ def get_data_loaders(dataset_path, mask_path, input_dimensions, seed=None, fold_
 
     return dataloaders
 
-def train_model(model, optimizer, scheduler, dataset_path, input_dimensions, num_epochs=25, mask_path=None, seed=None, fold_split=10):
+def train_model(model, optimizer, scheduler, dataset_path, input_dimensions, num_epochs=25, mask_path=None, seed=None, fold_split=10, loss_type='dice', swap=0.5):
     if mask_path == None:
         dataloaders = get_data_loaders(dataset_path=dataset_path, mask_path=dataset_path, input_dimensions=input_dimensions, seed=seed, fold_split=fold_split)
     else:
@@ -182,8 +192,7 @@ def train_model(model, optimizer, scheduler, dataset_path, input_dimensions, num
                     with torch.set_grad_enabled(phase == 'train'):
                         outputs = model(inputs)
                         optimizer.zero_grad()
-                        loss = calc_loss(outputs, masks, metrics)
-
+                        loss = calc_loss(outputs, masks, metrics, loss_type, swap, (epoch)/num_epochs)
                         # backward + optimize only if in training phase
                         if phase == 'train':
                             scaler.scale(loss).backward()
@@ -226,7 +235,7 @@ def train_model(model, optimizer, scheduler, dataset_path, input_dimensions, num
     model.load_state_dict(best_model_wts)
     return model, dataloaders
 
-def main(seed=42, input_dimensions=1, num_classes=1, epochs=200, folds=5, dataset_path="./support_images/dataset/raw/train", mask_path="./support_images/dataset/raw/sample", simple=False, simple_less_layers=False):
+def main(seed=42, input_dimensions=1, num_classes=1, epochs=200, folds=5, dataset_path="./support_images/dataset/raw/train", mask_path="./support_images/dataset/raw/sample", simple=False, simple_less_layers=False, loss_type='dice', swap=0.5):
     print("Starting the model")
 
 
@@ -247,7 +256,7 @@ def main(seed=42, input_dimensions=1, num_classes=1, epochs=200, folds=5, datase
     #optimizer_ft = optim.Adam(filter(lambda p: p.requires_grad, model.parameters()), lr=1e-6)
     exp_lr_scheduler = lr_scheduler.StepLR(optimizer_ft, step_size=30, gamma=0.1)
 
-    model, dataloaders = train_model(model, optimizer_ft, exp_lr_scheduler, input_dimensions=input_dimensions, num_epochs=epochs, dataset_path=dataset_path, mask_path=mask_path, seed=seed, fold_split=folds)
+    model, dataloaders = train_model(model, optimizer_ft, exp_lr_scheduler, input_dimensions=input_dimensions, num_epochs=epochs, dataset_path=dataset_path, mask_path=mask_path, seed=seed, fold_split=folds, loss_type=loss_type, swap=swap)
 
     model.eval()
     i = 1
