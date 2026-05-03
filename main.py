@@ -258,11 +258,11 @@ def main(seed=42, input_dimensions=1, num_classes=1, epochs=200, folds=10, datas
 
         pred = model(input)
         pred = F.sigmoid(pred)
-        pred = pred.data.cpu().numpy()
+        pred = pred.detach().cpu().numpy()
 
         pred = (pred[0] * 255).astype(np.uint8)
-        input = input.numpy()
-        mask = mask.numpy()
+        input = input.cpu().numpy()
+        mask = mask.cpu().numpy()
 
         out = Image.fromarray(pred[0])
         inn = Image.fromarray(input[0][0].astype(np.uint8), 'L')
