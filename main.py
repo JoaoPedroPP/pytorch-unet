@@ -111,6 +111,8 @@ def get_data_loaders(dataset_path, mask_path, input_dimensions, seed=None, fold_
 
     input_imgs.sort()
     mask_imgs.sort()
+    input_imgs = input_imgs[:int(len(input_imgs)/100)]
+    mask_imgs = mask_imgs[:int(len(mask_imgs)/100)]
 
     input_imgs_paths = list(map(lambda p: os.path.join(dataset_path, p), input_imgs))
     mask_imgs_paths = list(map(lambda p: os.path.join(mask_path, p), mask_imgs))
