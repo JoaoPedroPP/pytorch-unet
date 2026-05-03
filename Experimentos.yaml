@@ -4,11 +4,15 @@ general:
   lidc_regular_mask_path: &lidc_regular_mask_path ./support_images/dataset/raw
   lidc_edge_dataset_path: &lidc_edge_dataset_path ./support_images/dataset/raw2
   lidc_edge_mask_path: &lidc_edge_mask_path ./support_images/dataset/raw
+  vess_regular_dataset_path: &vess_regular_dataset_path ./support_images/dataset/Vessel
+  vess_regular_mask_path: &vess_regular_mask_path ./support_images/dataset/Vessel
+  vess_edge_dataset_path: &vess_edge_dataset_path ./support_images/dataset/vessel_gt+edge+mask/train
+  vess_edge_mask_path: &vess_edge_mask_path ./support_images/dataset/Vessel
   epochs: &epochs 200
   folds: &folds 5
   seed: &seed 42
 experimentos:
-  - name: Experimento 1
+  - name: Experimento 1 LIDC
     description: Experimento com loss Dice LIDC
     filename: "imagem_regular_200_epocas_10_folds_dice"
     execute: *execute
@@ -22,7 +26,21 @@ experimentos:
       simple: false
       input_dimensions: 1
       num_classes: 1
-  - name: Experimento 2
+  - name: Experimento 1 Vessel
+    description: Experimento com loss Dice Vessel
+    filename: "vessel_regular_200_epocas_10_folds_dice"
+    execute: *execute
+    parameters:
+      loss_type: dice
+      swap: 0.5
+      epochs: *epochs
+      folds: *folds
+      dataset_path: *vess_regular_dataset_path
+      mask_path: *vess_regular_mask_path
+      simple: false
+      input_dimensions: 1
+      num_classes: 1
+  - name: Experimento 2 LIDC
     description: Experimento com loss BCE LIDC
     filename: "imagem_regular_200_epocas_10_folds_bce"
     execute: *execute
@@ -36,7 +54,21 @@ experimentos:
       simple: false
       input_dimensions: 1
       num_classes: 1
-  - name: Experimento 3
+  - name: Experimento 2 Vessel
+    description: Experimento com loss BCE Vessel
+    filename: "vessel_regular_200_epocas_10_folds_bce"
+    execute: *execute
+    parameters:
+      loss_type: bce
+      swap: 0.5
+      epochs: *epochs
+      folds: *folds
+      dataset_path: *vess_regular_dataset_path
+      mask_path: *vess_regular_mask_path
+      simple: false
+      input_dimensions: 1
+      num_classes: 1
+  - name: Experimento 3 LIDC
     description: Experimento com loss Dice_BCE e swap 0.5 LIDC
     filename: "imagem_regular_200_epocas_10_folds_dice_bce_swap_0.5"
     execute: *execute
@@ -47,6 +79,20 @@ experimentos:
       folds: *folds
       dataset_path: *lidc_regular_dataset_path
       mask_path: *lidc_regular_mask_path
+      simple: false
+      input_dimensions: 1
+      num_classes: 1
+  - name: Experimento 3 Vessel
+    description: Experimento com loss Dice_BCE e swap 0.5 Vessel
+    filename: "vessel_regular_200_epocas_10_folds_dice_bce_swap_0.5"
+    execute: *execute
+    parameters:
+      loss_type: dice_bce
+      swap: 0.5
+      epochs: *epochs
+      folds: *folds
+      dataset_path: *vess_regular_dataset_path
+      mask_path: *vess_regular_mask_path
       simple: false
       input_dimensions: 1
       num_classes: 1
@@ -64,7 +110,21 @@ experimentos:
       simple: false
       input_dimensions: 2
       num_classes: 1
-  - name: Experimento 5
+  - name: Experimento 4 Vessel
+    description: Experimento com loss dice e informacao de borda Vessel
+    filename: "vessel_edge_200_epocas_10_folds_dice"
+    execute: *execute
+    parameters:
+      loss_type: dice
+      swap: 0.5
+      epochs: *epochs
+      folds: *folds
+      dataset_path: *vess_edge_dataset_path
+      mask_path: *vess_edge_mask_path
+      simple: false
+      input_dimensions: 2
+      num_classes: 1
+  - name: Experimento 5 LIDC
     description: Experimento com loss dice unet simples LIDC
     filename: "imagem_edge_200_epocas_10_folds_dice_unet_simples"
     execute: *execute
@@ -78,7 +138,21 @@ experimentos:
       simple: true
       input_dimensions: 1
       num_classes: 1
-  - name: Experimento 6
+  - name: Experimento 5 Vessel
+    description: Experimento com loss dice unet simples Vessel
+    filename: "vessel_regular_200_epocas_10_folds_dice_unet_simples"
+    execute: *execute
+    parameters:
+      loss_type: dice
+      swap: 0.5
+      epochs: *epochs
+      folds: *folds
+      dataset_path: *vess_regular_dataset_path
+      mask_path: *vess_regular_mask_path
+      simple: true
+      input_dimensions: 1
+      num_classes: 1
+  - name: Experimento 6 LIDC
     description: Experimento com loss dice informacao de borda unet simples LIDC
     filename: "imagem_edge_200_epocas_10_folds_dice_unet_simples_informacao_de_borda"
     execute: *execute
