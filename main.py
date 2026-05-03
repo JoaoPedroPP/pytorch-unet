@@ -90,7 +90,7 @@ def write_csv(data, mode='a', filename='logs.csv'):
 def get_data_loaders(dataset_path, mask_path, input_dimensions, seed=None, fold_split=10):
     # use the same transformations for train/val in this example
     # Fod edge combined imgaes
-    raw = list(filter(lambda l: not l.endswith('edge_mask.png'), os.listdir(mask_path)))
+    raw = list(filter(lambda l: l.endswith('.png') and not l.endswith('edge_mask.png'), os.listdir(mask_path)))
     # For regular input images
     if input_dimensions == 1:
         input_imgs = list(filter(lambda l: not l.endswith('mask.png'), raw))
@@ -108,7 +108,7 @@ def get_data_loaders(dataset_path, mask_path, input_dimensions, seed=None, fold_
 
     train_inputs, validation_inputs, train_masks, validation_masks = train_test_split(input_imgs_paths, mask_imgs_paths, test_size=0.2, shuffle=True, random_state=seed)
     folds = kf.split(train_inputs)
-    print(len(train_inputs), len(validation_inputs))
+    #print(len(train_inputs), len(validation_inputs))
 
     trans = transforms.Compose([
         transforms.ToTensor(),
@@ -124,12 +124,12 @@ def get_data_loaders(dataset_path, mask_path, input_dimensions, seed=None, fold_
     batch_size = 1
 
     dataloaders = {
-        'validation': DataLoader(validation_set, batch_size=batch_size, shuffle=False, num_workers=0)
+        'validation': DataLoader(validation_set, batch_size=batch_size, shuffle=True, num_workers=8, pin_memory=True, persistent_workers=True)
     }
     for i, (t1,t2) in enumerate(folds):
         dataloaders[f"k_{i}"] = {
-            'train': DataLoader(LIDCDataset(list(map(lambda inp: train_inputs[inp], t1)),list(map(lambda inp: train_masks[inp], t1)), dims=input_dimensions), batch_size=batch_size, shuffle=True, num_workers=0),
-            'test': DataLoader(LIDCDataset(list(map(lambda inp: train_inputs[inp], t2)),list(map(lambda inp: train_masks[inp], t2)), dims=input_dimensions), batch_size=batch_size, shuffle=True, num_workers=0),
+            'train': DataLoader(LIDCDataset(list(map(lambda inp: train_inputs[inp], t1)),list(map(lambda inp: train_masks[inp], t1)), dims=input_dimensions), batch_size=batch_size, shuffle=True, num_workers=8,pin_memory=True, persistent_workers=True),
+            'test': DataLoader(LIDCDataset(list(map(lambda inp: train_inputs[inp], t2)),list(map(lambda inp: train_masks[inp], t2)), dims=input_dimensions), batch_size=batch_size, shuffle=True, num_workers=8,pin_memory=True, persistent_workers=True),
         }
 
     return dataloaders
@@ -142,7 +142,6 @@ def train_model(model, optimizer, scheduler, dataset_path, input_dimensions, num
     device = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
     best_model_wts = copy.deepcopy(model.state_dict())
     best_loss = 1e10
-
 
     scaler = GradScaler(enabled=False)
 
@@ -170,7 +169,7 @@ def train_model(model, optimizer, scheduler, dataset_path, input_dimensions, num
 
                 metrics = defaultdict(float)
                 epoch_samples = 0
-
+                
                 for inputs, masks in dataloaders[f"k_{i}"][phase]:
                     inputs = inputs.float().to(device)
                     masks = masks.float().to(device)
@@ -227,7 +226,7 @@ def train_model(model, optimizer, scheduler, dataset_path, input_dimensions, num
     model.load_state_dict(best_model_wts)
     return model, dataloaders
 
-def main(seed=42, input_dimensions=1, num_classes=1, epochs=200, folds=10, dataset_path="./support_images/dataset/raw", mask_path="./support_images/dataset/raw", simple=False):
+def main(seed=42, input_dimensions=1, num_classes=1, epochs=200, folds=5, dataset_path="./support_images/dataset/raw/train", mask_path="./support_images/dataset/raw/sample", simple=False, simple_less_layers=False):
     print("Starting the model")
 
 
@@ -236,16 +235,16 @@ def main(seed=42, input_dimensions=1, num_classes=1, epochs=200, folds=10, datas
     # dataset_path = './support_images/dataset/raw'
     # mask_path = './support_images/dataset/raw'
     # mask_path = None
-    if input_dimensions == 2:
-        dataset_path = './support_images/dataset/raw2'
+    # if input_dimensions == 2:
+    #     dataset_path = './support_images/dataset/sample2'
 
     # For regular sets training
     # dataset_path = '/run/media/jpolonip/JP2-HD/MestradoFiles/Dataset/raw2/train'
     device = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
 
-    model = UNet(in_channels=input_dimensions, out_channels=num_classes, simple=simple).to(device)
+    model = UNet(in_channels=input_dimensions, out_channels=num_classes, simple=simple, simple_less_layers=simple_less_layers).to(device)
     optimizer_ft = optim.Adam(filter(lambda p: p.requires_grad, model.parameters()), lr=1e-5)
-
+    #optimizer_ft = optim.Adam(filter(lambda p: p.requires_grad, model.parameters()), lr=1e-6)
     exp_lr_scheduler = lr_scheduler.StepLR(optimizer_ft, step_size=30, gamma=0.1)
 
     model, dataloaders = train_model(model, optimizer_ft, exp_lr_scheduler, input_dimensions=input_dimensions, num_epochs=epochs, dataset_path=dataset_path, mask_path=mask_path, seed=seed, fold_split=folds)
@@ -258,11 +257,11 @@ def main(seed=42, input_dimensions=1, num_classes=1, epochs=200, folds=10, datas
 
         pred = model(input)
         pred = F.sigmoid(pred)
-        pred = pred.data.cpu().numpy()
+        pred = pred.detach().cpu().numpy()
 
         pred = (pred[0] * 255).astype(np.uint8)
-        input = input.numpy()
-        mask = mask.numpy()
+        input = input.cpu().numpy()
+        mask = mask.cpu().numpy()
 
         out = Image.fromarray(pred[0])
         inn = Image.fromarray(input[0][0].astype(np.uint8), 'L')

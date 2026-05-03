@@ -15,6 +15,7 @@ def main():
     parser.add_argument("--dataset-path", type=str, default="./support_images/dataset/raw", help="Caminho para o diretório do dataset")
     parser.add_argument("--mask-path", type=str, default="./support_images/dataset/raw", help="Caminho para o diretório das máscaras")
     parser.add_argument("--simple", action="store_true", help="Utiliza a versão simplificada da U-Net")
+    parser.add_argument("--simple-less-layers", action="store_true", help="Utiliza a versão simplificada da U-Net com menos camadas")
 
     args = parser.parse_args()
     if "run" in args.acao:
@@ -26,7 +27,8 @@ def main():
             folds=args.folds,
             dataset_path=args.dataset_path,
             mask_path=args.mask_path,
-            simple=args.simple
+            simple=args.simple,
+            simple_less_layers=args.simple_less_layers,
         )
 
 if __name__ == "__main__":
