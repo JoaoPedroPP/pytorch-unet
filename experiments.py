@@ -16,6 +16,7 @@ def main():
             print(f"Experimento {experiment['name']} finalizado")
             print("Guardando resultados...")
             os.system(f"mv logs.csv ./support_images/preds/logs.csv")
+            os.system(f"mv model.pth ./support_images/preds/model.pth")
             os.system(f"mv ./support_images/preds ./support_images/{datetime.now().strftime('%Y%m%d_%H%M%S')}_preds_{experiment['filename']}")
             os.system("mkdir ./support_images/preds")
     print("Experimentos finalizados")

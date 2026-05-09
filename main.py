@@ -166,6 +166,12 @@ def train_model(model, optimizer, scheduler, dataset_path, input_dimensions, num
         best_csv_metrics = []
         fold_metrics = []
         since = time.time()
+        if epoch > 0:
+            checkpoint = torch.load('./model.pth', weights_only=False)
+            model.load_state_dict(checkpoint['model_state_dict'])
+            optimizer.load_state_dict(checkpoint['optimizer_state_dict'])
+            best_loss = checkpoint['loss']
+            print(f"Loaded checkpoint from epoch {checkpoint['epoch']} with loss {best_loss}")
 
         for i in range(fold_split):
             print(f"Fold: {i}")
@@ -230,6 +236,9 @@ def train_model(model, optimizer, scheduler, dataset_path, input_dimensions, num
         if fold_metrics.mean() < best_loss:
             best_loss = fold_metrics.mean()
             best_model_wts = copy.deepcopy(model.state_dict())
+        
+        print(f"Saving model for epoch {epoch} with loss {best_loss}")
+        torch.save({ 'epoch': epoch, 'model_state_dict': model.state_dict(), 'loss': best_loss, 'optimizer_state_dict': optimizer.state_dict() }, './model.pth')
 
     print('Best val loss: {:4f}'.format(best_loss))
 
