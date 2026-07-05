@@ -1,9 +1,9 @@
 general:
-  execute: &execute true
-  lidc_regular_dataset_path: &lidc_regular_dataset_path ./support_images/dataset/raw
-  lidc_regular_mask_path: &lidc_regular_mask_path ./support_images/dataset/raw
-  lidc_edge_dataset_path: &lidc_edge_dataset_path ./support_images/dataset/raw2
-  lidc_edge_mask_path: &lidc_edge_mask_path ./support_images/dataset/raw
+  execute: &execute false
+  lidc_regular_dataset_path: &lidc_regular_dataset_path ./support_images/dataset/raw/train
+  lidc_regular_mask_path: &lidc_regular_mask_path ./support_images/dataset/raw/train
+  lidc_edge_dataset_path: &lidc_edge_dataset_path ./support_images/dataset/raw3
+  lidc_edge_mask_path: &lidc_edge_mask_path ./support_images/dataset/raw/train
   vess_regular_dataset_path: &vess_regular_dataset_path ./support_images/dataset/Vessel
   vess_regular_mask_path: &vess_regular_mask_path ./support_images/dataset/Vessel
   vess_edge_dataset_path: &vess_edge_dataset_path ./support_images/dataset/vessel_gt+edge+mask/train
@@ -209,4 +209,34 @@ experimentos:
       simple: false
       simple_less_layers: true
       input_dimensions: 1
+      num_classes: 1
+  - name: Experimento 8 LIDC
+    description: Experimento com loss dice unet simples menos camadas LIDC
+    filename: "imagem_edge_200_epocas_10_folds_dice_unet_simples_menos_camadas"
+    execute: *execute
+    parameters:
+      loss_type: dice
+      swap: 0.5
+      epochs: *epochs
+      folds: *folds
+      dataset_path: *lidc_edge_dataset_path
+      mask_path: *lidc_edge_mask_path
+      simple: false
+      simple_less_layers: true
+      input_dimensions: 2
+      num_classes: 1
+  - name: Experimento 8 Vessel
+    description: Experimento com loss dice unet simples menos camadas Vessel
+    filename: "vessel_edge_200_epocas_10_folds_dice_unet_simples_menos_camadas"
+    execute: *execute
+    parameters:
+      loss_type: dice
+      swap: 0.5
+      epochs: *epochs
+      folds: *folds
+      dataset_path: *vess_edge_dataset_path
+      mask_path: *vess_edge_mask_path
+      simple: false
+      simple_less_layers: true
+      input_dimensions: 2
       num_classes: 1

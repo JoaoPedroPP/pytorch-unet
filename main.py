@@ -111,6 +111,8 @@ def get_data_loaders(dataset_path, mask_path, input_dimensions, seed=None, fold_
 
     input_imgs.sort()
     mask_imgs.sort()
+    # input_imgs = input_imgs[:int(len(input_imgs)/3)]
+    # mask_imgs = mask_imgs[:int(len(mask_imgs)/3)]
     input_imgs = input_imgs[:int(len(input_imgs)/100)]
     mask_imgs = mask_imgs[:int(len(mask_imgs)/100)]
 
@@ -136,12 +138,12 @@ def get_data_loaders(dataset_path, mask_path, input_dimensions, seed=None, fold_
     batch_size = 1
 
     dataloaders = {
-        'validation': DataLoader(validation_set, batch_size=batch_size, shuffle=True, num_workers=8, pin_memory=True, persistent_workers=True)
+        'validation': DataLoader(validation_set, batch_size=batch_size, shuffle=True)
     }
     for i, (t1,t2) in enumerate(folds):
         dataloaders[f"k_{i}"] = {
-            'train': DataLoader(LIDCDataset(list(map(lambda inp: train_inputs[inp], t1)),list(map(lambda inp: train_masks[inp], t1)), dims=input_dimensions), batch_size=batch_size, shuffle=True, num_workers=8,pin_memory=True, persistent_workers=True),
-            'test': DataLoader(LIDCDataset(list(map(lambda inp: train_inputs[inp], t2)),list(map(lambda inp: train_masks[inp], t2)), dims=input_dimensions), batch_size=batch_size, shuffle=True, num_workers=8,pin_memory=True, persistent_workers=True),
+            'train': DataLoader(LIDCDataset(list(map(lambda inp: train_inputs[inp], t1)),list(map(lambda inp: train_masks[inp], t1)), dims=input_dimensions), batch_size=batch_size, shuffle=True),
+            'test': DataLoader(LIDCDataset(list(map(lambda inp: train_inputs[inp], t2)),list(map(lambda inp: train_masks[inp], t2)), dims=input_dimensions), batch_size=batch_size, shuffle=True),
         }
 
     return dataloaders
