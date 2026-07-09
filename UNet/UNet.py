@@ -65,7 +65,7 @@ class UNet(nn.Module):
         # Original
         self.middle_conv = DoubleConvolution(512, 1024)
         # Without the last layer
-        if simple:
+        if simple or simple_less_layers:
            self.middle_conv = DoubleConvolution(256, 512)
 
         # Original
