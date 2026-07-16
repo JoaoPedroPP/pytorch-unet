@@ -148,6 +148,14 @@ def get_data_loaders(dataset_path, mask_path, input_dimensions, seed=None, fold_
 
 def get_data_loaders_by_exam(dataset_path, mask_path, input_dimensions, seed=None, fold_split=10):
     # use the same transformations for train/val in this example
+    if "vessel" in dataset_path.lower():
+        constant = 1
+        lidc = False
+        print("Vessel")
+    else:
+        constant = 1
+        lidc = True
+        print("lidc")
     # Fod edge combined imgaes
     raw = list(filter(lambda l: l.endswith('.png') and not l.endswith('edge_mask.png'), os.listdir(mask_path)))
 
@@ -161,14 +169,27 @@ def get_data_loaders_by_exam(dataset_path, mask_path, input_dimensions, seed=Non
     folds = kf.split(train_exams_inputs)
     # For regular input images
     if input_dimensions == 1:
-        input_imgs = list(filter(lambda l: not l.endswith('mask.png') and l[0:14] in train_exams_inputs, raw))
-        validation_input_imgs = list(filter(lambda l: not l.endswith('mask.png') and l[0:14] in validation_exams_inputs, raw))
+        if lidc:
+            input_imgs = list(filter(lambda l: not l.endswith('mask.png') and l[0:14] in train_exams_inputs, raw))
+            validation_input_imgs = list(filter(lambda l: not l.endswith('mask.png') and l[0:14] in validation_exams_inputs, raw))
+        else:
+            input_imgs = list(filter(lambda l: not l.endswith('mask.png') and l[0:3] in train_exams_inputs, raw))
+            validation_input_imgs = list(filter(lambda l: not l.endswith('mask.png') and l[0:3] in validation_exams_inputs, raw))
     else:
         # For npy 2 dim images
-        input_imgs = list(filter(lambda l: l.endswith('.npy') and l[0:14] in train_exams_inputs, os.listdir(dataset_path)))
+        if lidc:
+            input_imgs = list(filter(lambda l: l.endswith('.npy') and l[0:14] in train_exams_inputs, os.listdir(dataset_path)))
+            validation_input_imgs = list(filter(lambda l: l.endswith('.npy') and l[0:14] in validation_exams_inputs, os.listdir(dataset_path)))
+        else:
+            input_imgs = list(filter(lambda l: l.endswith('.npy') and l[0:3] in train_exams_inputs, os.listdir(dataset_path)))
+            validation_input_imgs = list(filter(lambda l: l.endswith('.npy') and l[0:3] in validation_exams_inputs, os.listdir(dataset_path)))
         validation_input_imgs = list(filter(lambda l: l.endswith('.npy') and l[0:14] in validation_exams_inputs, os.listdir(dataset_path)))
-    mask_imgs = list(filter(lambda l: l.endswith('mask.png') and l[0:14] in train_exams_inputs, raw))
-    validation_mask_imgs = list(filter(lambda l: l.endswith('mask.png') and l[0:14] in validation_exams_inputs, raw))
+    if lidc:
+        mask_imgs = list(filter(lambda l: l.endswith('mask.png') and l[0:14] in train_exams_inputs, raw))
+        validation_mask_imgs = list(filter(lambda l: l.endswith('mask.png') and l[0:14] in validation_exams_inputs, raw))
+    else:
+        mask_imgs = list(filter(lambda l: l.endswith('mask.png') and l[0:3] in train_exams_inputs, raw))
+        validation_mask_imgs = list(filter(lambda l: l.endswith('mask.png') and l[0:3] in validation_exams_inputs, raw))
 
     input_imgs.sort()
     mask_imgs.sort()
@@ -176,12 +197,6 @@ def get_data_loaders_by_exam(dataset_path, mask_path, input_dimensions, seed=Non
     validation_input_imgs.sort()
     validation_mask_imgs.sort()
 
-    if "vessel" in dataset_path.lower():
-        constant = 3
-        print("Vessel")
-    else:
-        constant = 100
-        print("lidc")
     # input_imgs = input_imgs[:int(len(input_imgs)/3)]
     # mask_imgs = mask_imgs[:int(len(mask_imgs)/3)]
     input_imgs = input_imgs[:int(len(input_imgs)/constant)]
@@ -212,13 +227,15 @@ def get_data_loaders_by_exam(dataset_path, mask_path, input_dimensions, seed=Non
         'validation': DataLoader(validation_set, batch_size=batch_size, shuffle=False)
     }
     for i, (t1,t2) in enumerate(folds):
-        #a = list(filter(lambda x: x.split("/")[-1].split("_")[0] in [train_exams_inputs[f] for f in t1], input_imgs_paths))
-        #a = list(filter(lambda x: x.split("/")[-1].split("_")[0] in [train_exams_inputs[f] for f in t1], mask_imgs_paths))
+        train_fold = list(map(lambda z: train_exams_inputs[z], t1))
+        test_fold = list(map(lambda z: train_exams_inputs[z], t2))
+        a = list(filter(lambda x: x.split("/")[-1].split("_")[0] in train_fold, input_imgs_paths))
+        b = list(filter(lambda x: x.split("/")[-1].split("_")[0] in train_fold, mask_imgs_paths))
+        # print(a)
+        # print(b)
         dataloaders[f"k_{i}"] = {
-            #'train': DataLoader(LIDCDataset(list(map(lambda inp: train_inputs[inp], t1)),list(map(lambda inp: train_masks[inp], t1)), dims=input_dimensions), batch_size=batch_size, shuffle=True),
-            'train': DataLoader(LIDCDataset(list(filter(lambda x: x.split("/")[-1].split("_")[0] in [train_exams_inputs[f] for f in t1], input_imgs_paths)),list(filter(lambda x: x.split("/")[-1].split("_")[0] in [train_exams_inputs[f] for f in t1], mask_imgs_paths)), dims=input_dimensions), batch_size=batch_size, shuffle=True),
-            #'test': DataLoader(LIDCDataset(list(map(lambda inp: train_inputs[inp], t2)),list(map(lambda inp: train_masks[inp], t2)), dims=input_dimensions), batch_size=batch_size, shuffle=True),
-            'test': DataLoader(LIDCDataset(list(filter(lambda x: x.split("/")[-1].split("_")[0] in [train_exams_inputs[f] for f in t2], input_imgs_paths)),list(filter(lambda x: x.split("/")[-1].split("_")[0] in [train_exams_inputs[f] for f in t2], mask_imgs_paths)), dims=input_dimensions), batch_size=batch_size, shuffle=True),
+            'train': DataLoader(LIDCDataset(list(filter(lambda x: x.split("/")[-1].split("_")[0] in train_fold, input_imgs_paths)),list(filter(lambda x: x.split("/")[-1].split("_")[0] in train_fold, mask_imgs_paths)), dims=input_dimensions), batch_size=batch_size, shuffle=True),
+            'test': DataLoader(LIDCDataset(list(filter(lambda x: x.split("/")[-1].split("_")[0] in test_fold, input_imgs_paths)),list(filter(lambda x: x.split("/")[-1].split("_")[0] in test_fold, mask_imgs_paths)), dims=input_dimensions), batch_size=batch_size, shuffle=True),
         }
 
     return dataloaders
