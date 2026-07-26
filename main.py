@@ -147,6 +147,7 @@ def get_data_loaders(dataset_path, mask_path, input_dimensions, seed=None, fold_
 
 
 def get_data_loaders_by_exam(dataset_path, mask_path, input_dimensions, seed=None, fold_split=10):
+    print(seed)
     # use the same transformations for train/val in this example
     if "vessel" in dataset_path.lower():
         constant = 1
@@ -164,7 +165,7 @@ def get_data_loaders_by_exam(dataset_path, mask_path, input_dimensions, seed=Non
         exam_name = exam.split("_")[0]
         if exam_name not in raw_by_exam:
             raw_by_exam.add(exam_name)
-    train_exams_inputs, validation_exams_inputs, train_exams_masks, validation_exams_masks = train_test_split(list(raw_by_exam), list(raw_by_exam), test_size=0.2, shuffle=True, random_state=seed)
+    train_exams_inputs, validation_exams_inputs, train_exams_masks, validation_exams_masks = train_test_split(list(raw_by_exam), list(raw_by_exam), test_size=0.2, shuffle=False, random_state=seed)
     kf = KFold(n_splits=fold_split)
     folds = kf.split(train_exams_inputs)
     # For regular input images
@@ -202,8 +203,8 @@ def get_data_loaders_by_exam(dataset_path, mask_path, input_dimensions, seed=Non
     input_imgs = input_imgs[:int(len(input_imgs)/constant)]
     mask_imgs = mask_imgs[:int(len(mask_imgs)/constant)]
 
-    validation_input_imgs = validation_input_imgs[:int(len(validation_input_imgs)/constant)]
-    validation_mask_imgs = validation_mask_imgs[:int(len(validation_mask_imgs)/constant)]
+    # validation_input_imgs = validation_input_imgs[:int(len(validation_input_imgs)/constant)]
+    # validation_mask_imgs = validation_mask_imgs[:int(len(validation_mask_imgs)/constant)]
 
 
     input_imgs_paths = list(map(lambda p: os.path.join(dataset_path, p), input_imgs))
