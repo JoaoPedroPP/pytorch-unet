@@ -160,48 +160,69 @@ def get_data_loaders_by_exam(dataset_path, mask_path, input_dimensions, seed=Non
     # Fod edge combined imgaes
     raw = list(filter(lambda l: l.endswith('.png') and not l.endswith('edge_mask.png'), os.listdir(mask_path)))
 
+    # For regular input images
+    if input_dimensions == 1:
+        input_imgs = list(filter(lambda l: not l.endswith('mask.png'), raw))
+    else:
+        # For npy 2 dim images
+        input_imgs = list(filter(lambda l: l.endswith('.npy'), os.listdir(dataset_path)))
+    mask_imgs = list(filter(lambda l: l.endswith('mask.png'), raw))
+
+    input_imgs.sort()
+    mask_imgs.sort()
+    # input_imgs = input_imgs[:int(len(input_imgs)/3)]
+    # mask_imgs = mask_imgs[:int(len(mask_imgs)/3)]
+    input_imgs = input_imgs[:int(len(input_imgs)/constant)]
+    mask_imgs = mask_imgs[:int(len(mask_imgs)/constant)]
+
+    input_imgs_paths = list(map(lambda p: os.path.join(dataset_path, p), input_imgs))
+    mask_imgs_paths = list(map(lambda p: os.path.join(mask_path, p), mask_imgs))
+
+    train_inputs, validation_inputs, train_masks, validation_masks = train_test_split(input_imgs_paths, mask_imgs_paths, test_size=0.2, shuffle=False, random_state=seed)
+
     raw_by_exam = set()
-    for exam in raw:
-        exam_name = exam.split("_")[0]
-        if exam_name not in raw_by_exam:
+    for exam in train_inputs:
+        exam_name = exam.split("/")[-1].split("_")[0]
+        if exam_name not in train_inputs:
             raw_by_exam.add(exam_name)
-    train_exams_inputs, validation_exams_inputs, train_exams_masks, validation_exams_masks = train_test_split(list(raw_by_exam), list(raw_by_exam), test_size=0.2, shuffle=False, random_state=seed)
+    # train_exams_inputs, validation_exams_inputs, train_exams_masks, validation_exams_masks = train_test_split(list(raw_by_exam), list(raw_by_exam), test_size=0.2, shuffle=False, random_state=seed)
+    train_exams_inputs = list(raw_by_exam)
     kf = KFold(n_splits=fold_split)
     folds = kf.split(train_exams_inputs)
     # For regular input images
     if input_dimensions == 1:
         if lidc:
             input_imgs = list(filter(lambda l: not l.endswith('mask.png') and l[0:14] in train_exams_inputs, raw))
-            validation_input_imgs = list(filter(lambda l: not l.endswith('mask.png') and l[0:14] in validation_exams_inputs, raw))
+            # validation_input_imgs = list(filter(lambda l: not l.endswith('mask.png') and l[0:14] in validation_exams_inputs, raw))
         else:
             input_imgs = list(filter(lambda l: not l.endswith('mask.png') and l[0:3] in train_exams_inputs, raw))
-            validation_input_imgs = list(filter(lambda l: not l.endswith('mask.png') and l[0:3] in validation_exams_inputs, raw))
+            # validation_input_imgs = list(filter(lambda l: not l.endswith('mask.png') and l[0:3] in validation_exams_inputs, raw))
     else:
         # For npy 2 dim images
         if lidc:
             input_imgs = list(filter(lambda l: l.endswith('.npy') and l[0:14] in train_exams_inputs, os.listdir(dataset_path)))
-            validation_input_imgs = list(filter(lambda l: l.endswith('.npy') and l[0:14] in validation_exams_inputs, os.listdir(dataset_path)))
+            # validation_input_imgs = list(filter(lambda l: l.endswith('.npy') and l[0:14] in validation_exams_inputs, os.listdir(dataset_path)))
         else:
             input_imgs = list(filter(lambda l: l.endswith('.npy') and l[0:3] in train_exams_inputs, os.listdir(dataset_path)))
-            validation_input_imgs = list(filter(lambda l: l.endswith('.npy') and l[0:3] in validation_exams_inputs, os.listdir(dataset_path)))
-        validation_input_imgs = list(filter(lambda l: l.endswith('.npy') and l[0:14] in validation_exams_inputs, os.listdir(dataset_path)))
+            # validation_input_imgs = list(filter(lambda l: l.endswith('.npy') and l[0:3] in validation_exams_inputs, os.listdir(dataset_path)))
+        # validation_input_imgs = list(filter(lambda l: l.endswith('.npy') and l[0:14] in validation_exams_inputs, os.listdir(dataset_path)))
     if lidc:
         mask_imgs = list(filter(lambda l: l.endswith('mask.png') and l[0:14] in train_exams_inputs, raw))
-        validation_mask_imgs = list(filter(lambda l: l.endswith('mask.png') and l[0:14] in validation_exams_inputs, raw))
+        # validation_mask_imgs = list(filter(lambda l: l.endswith('mask.png') and l[0:14] in validation_exams_inputs, raw))
     else:
         mask_imgs = list(filter(lambda l: l.endswith('mask.png') and l[0:3] in train_exams_inputs, raw))
-        validation_mask_imgs = list(filter(lambda l: l.endswith('mask.png') and l[0:3] in validation_exams_inputs, raw))
+        # validation_mask_imgs = list(filter(lambda l: l.endswith('mask.png') and l[0:3] in validation_exams_inputs, raw))
 
     input_imgs.sort()
     mask_imgs.sort()
 
-    validation_input_imgs.sort()
-    validation_mask_imgs.sort()
+    # validation_input_imgs.sort()
+    # validation_mask_imgs.sort()
 
     # input_imgs = input_imgs[:int(len(input_imgs)/3)]
     # mask_imgs = mask_imgs[:int(len(mask_imgs)/3)]
-    input_imgs = input_imgs[:int(len(input_imgs)/constant)]
-    mask_imgs = mask_imgs[:int(len(mask_imgs)/constant)]
+    # input_imgs = input_imgs[:int(len(input_imgs)/constant)]
+    # mask_imgs = mask_imgs[:int(len(mask_imgs)/constant)]
 
     # validation_input_imgs = validation_input_imgs[:int(len(validation_input_imgs)/constant)]
     # validation_mask_imgs = validation_mask_imgs[:int(len(validation_mask_imgs)/constant)]
@@ -210,8 +231,8 @@ def get_data_loaders_by_exam(dataset_path, mask_path, input_dimensions, seed=Non
     input_imgs_paths = list(map(lambda p: os.path.join(dataset_path, p), input_imgs))
     mask_imgs_paths = list(map(lambda p: os.path.join(mask_path, p), mask_imgs))
 
-    validation_input_imgs_paths = list(map(lambda p: os.path.join(dataset_path, p), validation_input_imgs))
-    validation_mask_imgs_paths = list(map(lambda p: os.path.join(mask_path, p), validation_mask_imgs))
+    # validation_input_imgs_paths = list(map(lambda p: os.path.join(dataset_path, p), validation_input_imgs))
+    # validation_mask_imgs_paths = list(map(lambda p: os.path.join(mask_path, p), validation_mask_imgs))
 
     #print(len(train_inputs), len(validation_inputs))
 
@@ -220,7 +241,8 @@ def get_data_loaders_by_exam(dataset_path, mask_path, input_dimensions, seed=Non
         transforms.Normalize([0.485, 0.456, 0.406], [0.229, 0.224, 0.225]) # imagenet
     ])
 
-    validation_set = LIDCDataset(validation_input_imgs_paths,validation_mask_imgs_paths, dims=input_dimensions)
+    # validation_set = LIDCDataset(validation_input_imgs_paths,validation_mask_imgs_paths, dims=input_dimensions)
+    validation_set = LIDCDataset(validation_inputs,validation_masks, dims=input_dimensions)
 
     batch_size = 1
 
@@ -230,10 +252,6 @@ def get_data_loaders_by_exam(dataset_path, mask_path, input_dimensions, seed=Non
     for i, (t1,t2) in enumerate(folds):
         train_fold = list(map(lambda z: train_exams_inputs[z], t1))
         test_fold = list(map(lambda z: train_exams_inputs[z], t2))
-        a = list(filter(lambda x: x.split("/")[-1].split("_")[0] in train_fold, input_imgs_paths))
-        b = list(filter(lambda x: x.split("/")[-1].split("_")[0] in train_fold, mask_imgs_paths))
-        # print(a)
-        # print(b)
         dataloaders[f"k_{i}"] = {
             'train': DataLoader(LIDCDataset(list(filter(lambda x: x.split("/")[-1].split("_")[0] in train_fold, input_imgs_paths)),list(filter(lambda x: x.split("/")[-1].split("_")[0] in train_fold, mask_imgs_paths)), dims=input_dimensions), batch_size=batch_size, shuffle=True),
             'test': DataLoader(LIDCDataset(list(filter(lambda x: x.split("/")[-1].split("_")[0] in test_fold, input_imgs_paths)),list(filter(lambda x: x.split("/")[-1].split("_")[0] in test_fold, mask_imgs_paths)), dims=input_dimensions), batch_size=batch_size, shuffle=True),
