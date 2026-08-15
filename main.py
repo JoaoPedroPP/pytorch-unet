@@ -131,10 +131,6 @@ def get_data_loaders(dataset_path, mask_path, input_dimensions, seed=None, fold_
 
     validation_set = LIDCDataset(validation_inputs,validation_masks, dims=input_dimensions)
 
-    # image_datasets = {
-    #     'train': train_set, 'test': test_set, 'validation': validation_set
-    # }
-
     batch_size = 1
 
     dataloaders = {
@@ -148,11 +144,127 @@ def get_data_loaders(dataset_path, mask_path, input_dimensions, seed=None, fold_
 
     return dataloaders
 
+
+
+def get_data_loaders_by_exam(dataset_path, mask_path, input_dimensions, seed=None, fold_split=10):
+    print(seed)
+    # use the same transformations for train/val in this example
+    if "vessel" in dataset_path.lower():
+        constant = 1
+        lidc = False
+        print("Vessel")
+    else:
+        constant = 1
+        lidc = True
+        print("lidc")
+    # Fod edge combined imgaes
+    raw = list(filter(lambda l: l.endswith('.png') and not l.endswith('edge_mask.png'), os.listdir(mask_path)))
+
+    # For regular input images
+    if input_dimensions == 1:
+        input_imgs = list(filter(lambda l: not l.endswith('mask.png'), raw))
+    else:
+        # For npy 2 dim images
+        input_imgs = list(filter(lambda l: l.endswith('.npy'), os.listdir(dataset_path)))
+    mask_imgs = list(filter(lambda l: l.endswith('mask.png'), raw))
+
+    input_imgs.sort()
+    mask_imgs.sort()
+    # input_imgs = input_imgs[:int(len(input_imgs)/3)]
+    # mask_imgs = mask_imgs[:int(len(mask_imgs)/3)]
+    input_imgs = input_imgs[:int(len(input_imgs)/constant)]
+    mask_imgs = mask_imgs[:int(len(mask_imgs)/constant)]
+
+    input_imgs_paths = list(map(lambda p: os.path.join(dataset_path, p), input_imgs))
+    mask_imgs_paths = list(map(lambda p: os.path.join(mask_path, p), mask_imgs))
+
+    train_inputs, validation_inputs, train_masks, validation_masks = train_test_split(input_imgs_paths, mask_imgs_paths, test_size=0.2, shuffle=False, random_state=seed)
+
+    raw_by_exam = set()
+    for exam in train_inputs:
+        exam_name = exam.split("/")[-1].split("_")[0]
+        if exam_name not in train_inputs:
+            raw_by_exam.add(exam_name)
+    # train_exams_inputs, validation_exams_inputs, train_exams_masks, validation_exams_masks = train_test_split(list(raw_by_exam), list(raw_by_exam), test_size=0.2, shuffle=False, random_state=seed)
+    train_exams_inputs = list(raw_by_exam)
+    kf = KFold(n_splits=fold_split)
+    folds = kf.split(train_exams_inputs)
+    # For regular input images
+    if input_dimensions == 1:
+        if lidc:
+            input_imgs = list(filter(lambda l: not l.endswith('mask.png') and l[0:14] in train_exams_inputs, raw))
+            # validation_input_imgs = list(filter(lambda l: not l.endswith('mask.png') and l[0:14] in validation_exams_inputs, raw))
+        else:
+            input_imgs = list(filter(lambda l: not l.endswith('mask.png') and l[0:3] in train_exams_inputs, raw))
+            # validation_input_imgs = list(filter(lambda l: not l.endswith('mask.png') and l[0:3] in validation_exams_inputs, raw))
+    else:
+        # For npy 2 dim images
+        if lidc:
+            input_imgs = list(filter(lambda l: l.endswith('.npy') and l[0:14] in train_exams_inputs, os.listdir(dataset_path)))
+            # validation_input_imgs = list(filter(lambda l: l.endswith('.npy') and l[0:14] in validation_exams_inputs, os.listdir(dataset_path)))
+        else:
+            input_imgs = list(filter(lambda l: l.endswith('.npy') and l[0:3] in train_exams_inputs, os.listdir(dataset_path)))
+            # validation_input_imgs = list(filter(lambda l: l.endswith('.npy') and l[0:3] in validation_exams_inputs, os.listdir(dataset_path)))
+        # validation_input_imgs = list(filter(lambda l: l.endswith('.npy') and l[0:14] in validation_exams_inputs, os.listdir(dataset_path)))
+    if lidc:
+        mask_imgs = list(filter(lambda l: l.endswith('mask.png') and l[0:14] in train_exams_inputs, raw))
+        # validation_mask_imgs = list(filter(lambda l: l.endswith('mask.png') and l[0:14] in validation_exams_inputs, raw))
+    else:
+        mask_imgs = list(filter(lambda l: l.endswith('mask.png') and l[0:3] in train_exams_inputs, raw))
+        # validation_mask_imgs = list(filter(lambda l: l.endswith('mask.png') and l[0:3] in validation_exams_inputs, raw))
+
+    input_imgs.sort()
+    mask_imgs.sort()
+
+    # validation_input_imgs.sort()
+    # validation_mask_imgs.sort()
+
+    # input_imgs = input_imgs[:int(len(input_imgs)/3)]
+    # mask_imgs = mask_imgs[:int(len(mask_imgs)/3)]
+    # input_imgs = input_imgs[:int(len(input_imgs)/constant)]
+    # mask_imgs = mask_imgs[:int(len(mask_imgs)/constant)]
+
+    # validation_input_imgs = validation_input_imgs[:int(len(validation_input_imgs)/constant)]
+    # validation_mask_imgs = validation_mask_imgs[:int(len(validation_mask_imgs)/constant)]
+
+
+    input_imgs_paths = list(map(lambda p: os.path.join(dataset_path, p), input_imgs))
+    mask_imgs_paths = list(map(lambda p: os.path.join(mask_path, p), mask_imgs))
+
+    # validation_input_imgs_paths = list(map(lambda p: os.path.join(dataset_path, p), validation_input_imgs))
+    # validation_mask_imgs_paths = list(map(lambda p: os.path.join(mask_path, p), validation_mask_imgs))
+
+    #print(len(train_inputs), len(validation_inputs))
+
+    trans = transforms.Compose([
+        transforms.ToTensor(),
+        transforms.Normalize([0.485, 0.456, 0.406], [0.229, 0.224, 0.225]) # imagenet
+    ])
+
+    # validation_set = LIDCDataset(validation_input_imgs_paths,validation_mask_imgs_paths, dims=input_dimensions)
+    validation_set = LIDCDataset(validation_inputs,validation_masks, dims=input_dimensions)
+
+    batch_size = 1
+
+    dataloaders = {
+        'validation': DataLoader(validation_set, batch_size=batch_size, shuffle=False)
+    }
+    for i, (t1,t2) in enumerate(folds):
+        train_fold = list(map(lambda z: train_exams_inputs[z], t1))
+        test_fold = list(map(lambda z: train_exams_inputs[z], t2))
+        dataloaders[f"k_{i}"] = {
+            'train': DataLoader(LIDCDataset(list(filter(lambda x: x.split("/")[-1].split("_")[0] in train_fold, input_imgs_paths)),list(filter(lambda x: x.split("/")[-1].split("_")[0] in train_fold, mask_imgs_paths)), dims=input_dimensions), batch_size=batch_size, shuffle=True),
+            'test': DataLoader(LIDCDataset(list(filter(lambda x: x.split("/")[-1].split("_")[0] in test_fold, input_imgs_paths)),list(filter(lambda x: x.split("/")[-1].split("_")[0] in test_fold, mask_imgs_paths)), dims=input_dimensions), batch_size=batch_size, shuffle=True),
+        }
+
+    return dataloaders
+
 def train_model(model, optimizer, scheduler, dataset_path, input_dimensions, num_epochs=25, mask_path=None, seed=None, fold_split=10, loss_type='dice', swap=0.5):
     if mask_path == None:
         dataloaders = get_data_loaders(dataset_path=dataset_path, mask_path=dataset_path, input_dimensions=input_dimensions, seed=seed, fold_split=fold_split)
     else:
-        dataloaders = get_data_loaders(dataset_path=dataset_path, mask_path=mask_path, input_dimensions=input_dimensions, seed=seed,fold_split=fold_split)
+        dataloaders = get_data_loaders_by_exam(dataset_path=dataset_path, mask_path=mask_path, input_dimensions=input_dimensions, seed=seed,fold_split=fold_split)
+        #dataloaders = get_data_loaders(dataset_path=dataset_path, mask_path=mask_path, input_dimensions=input_dimensions, seed=seed,fold_split=fold_split)
     device = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
     best_model_wts = copy.deepcopy(model.state_dict())
     best_loss = 1e10
@@ -189,7 +301,7 @@ def train_model(model, optimizer, scheduler, dataset_path, input_dimensions, num
 
                 metrics = defaultdict(float)
                 epoch_samples = 0
-                
+
                 for inputs, masks in dataloaders[f"k_{i}"][phase]:
                     inputs = inputs.float().to(device)
                     masks = masks.float().to(device)
@@ -221,11 +333,7 @@ def train_model(model, optimizer, scheduler, dataset_path, input_dimensions, num
 
                 # deep copy the model
                 if phase == 'test':
-                    # print("saving best model")
-                    # best_csv_metrics = csv_metrics
-                    # best_loss = epoch_loss
                     fold_metrics.append(epoch_loss)
-                    # best_model_wts = copy.deepcopy(model.state_dict())
 
             write_csv(csv_metrics)
 
@@ -238,7 +346,7 @@ def train_model(model, optimizer, scheduler, dataset_path, input_dimensions, num
         if fold_metrics.mean() < best_loss:
             best_loss = fold_metrics.mean()
             best_model_wts = copy.deepcopy(model.state_dict())
-        
+
         print(f"Saving model for epoch {epoch} with loss {best_loss}")
         torch.save({ 'epoch': epoch, 'model_state_dict': model.state_dict(), 'loss': best_loss, 'optimizer_state_dict': optimizer.state_dict() }, './model.pth')
 
@@ -292,7 +400,7 @@ def main(seed=42, input_dimensions=1, num_classes=1, epochs=200, folds=5, datase
         out.save(f'./support_images/preds/{i:05}_pred.png')
         inn.save(f'./support_images/preds/{i:05}_input.png')
         mak.save(f'./support_images/preds/{i:05}_mask.png')
-        
+
         i += 1
 
 
